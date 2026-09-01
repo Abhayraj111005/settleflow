@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: settleflow
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/settleflow
+    username: settleflow
+    password: settleflow
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

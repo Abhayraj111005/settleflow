@@ -1,4 +1,4 @@
-package com.settleflow.settleflow;
+package com.settleflow;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
