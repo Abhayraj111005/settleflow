@@ -8,11 +8,15 @@ public class Transaction {
 
     private UUID id;
 
+    private UUID settlementId;
+
     private String merchantId;
 
     private BigDecimal amount;
 
     private String status;
+
+    private String idempotencyKey;
 
     private LocalDateTime createdAt;
 }
