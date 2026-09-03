@@ -1,0 +1,10 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: settleflow-postgres
+    environment:
+      POSTGRES_DB: settleflow
+      POSTGRES_USER: settleflow
+      POSTGRES_PASSWORD: settleflow
+    ports:
+      - "5432:5432"

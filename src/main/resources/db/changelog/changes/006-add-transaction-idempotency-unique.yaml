@@ -1,0 +1,11 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 006-add-transaction-idempotency-unique
+      author: settleflow
+
+      changes:
+        - addUniqueConstraint:
+            tableName: transactions
+            columnNames: idempotency_key
+            constraintName: uk_transactions_idempotency_key

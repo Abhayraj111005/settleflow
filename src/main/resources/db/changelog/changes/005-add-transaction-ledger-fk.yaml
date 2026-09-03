@@ -1,0 +1,13 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 005-add-transaction-ledger-fk
+      author: settleflow
+
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: ledger_entries
+            baseColumnNames: transaction_id
+            referencedTableName: transactions
+            referencedColumnNames: id
+            constraintName: fk_ledger_entries_transaction

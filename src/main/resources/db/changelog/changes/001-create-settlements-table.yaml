@@ -1,0 +1,40 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 001-create-settlements-table
+      author: settleflow
+
+      changes:
+        - createTable:
+            tableName: settlements
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: merchant_id
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: amount
+                  type: DECIMAL(19,4)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: status
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false

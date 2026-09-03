@@ -1,0 +1,13 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 004-add-settlement-transaction-fk
+      author: settleflow
+
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: transactions
+            baseColumnNames: settlement_id
+            referencedTableName: settlements
+            referencedColumnNames: id
+            constraintName: fk_transactions_settlement
