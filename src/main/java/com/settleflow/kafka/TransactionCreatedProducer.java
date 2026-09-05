@@ -1,6 +1,9 @@
 package com.settleflow.kafka;
 
 import com.settleflow.entity.Transaction;
+
+import java.util.UUID;
+
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,17 +23,18 @@ public class TransactionCreatedProducer {
 
     public void publish(Transaction transaction) {
 
-        TransactionCreatedEvent event =
-                new TransactionCreatedEvent(
-                        transaction.getId(),
-                        transaction.getSettlementId(),
-                        transaction.getAccountId(),
-                        transaction.getMerchantId(),
-                        transaction.getAmount(),
-                        transaction.getStatus(),
-                        transaction.getIdempotencyKey(),
-                        transaction.getCreatedAt()
-                );
+       TransactionCreatedEvent event =
+        new TransactionCreatedEvent(
+                UUID.randomUUID(),
+                transaction.getId(),
+                transaction.getSettlementId(),
+                transaction.getAccountId(),
+                transaction.getMerchantId(),
+                transaction.getAmount(),
+                transaction.getStatus(),
+                transaction.getIdempotencyKey(),
+                transaction.getCreatedAt()
+        );
 
         kafkaTemplate.send(
                 TOPIC,
