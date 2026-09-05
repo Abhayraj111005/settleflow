@@ -105,3 +105,15 @@ Verified response:
   ],
   "status": "UP"
 }
+
+
+## Kakfa:
+
+Kafka partitions are used mainly for scalability and parallel processing. A Kafka topic can be divided into multiple partitions, so instead of every transaction going through one single stream, transactions can be distributed across multiple partitions and processed independently by consumers. 
+In our SettleFlow design, we start with 3 partitions for settlement.transactions.created.
+
+The Kafka key determines which partition an event goes to. We want to use accountId as the key because Kafka keeps events with the same key in the same partition. This is important because Kafka guarantees ordering within a partition. So if multiple transactions belong to the same account, using the same accountId as the key ensures those events go to the same partition and are processed in their original order.
+At the same time, transactions belonging to different accounts can be distributed across the other partitions and processed in parallel.
+
+We proposed adding an accountId column to the Transaction table because the producer needs the account ID to use it as the Kafka key. 
+So the overall idea is: partitions provide parallelism, the Kafka key provides consistent routing, and using accountId as the key gives us ordering for transactions belonging to the same account.

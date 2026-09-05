@@ -15,8 +15,7 @@ import java.util.Map;
 @Configuration
 public class KafkaProducerConfig {
 
-    @Bean
-    public ProducerFactory<String, SettlementCreatedEvent> producerFactory() {
+    private Map<String, Object> producerProperties() {
 
         Map<String, Object> properties = new HashMap<>();
 
@@ -35,12 +34,39 @@ public class KafkaProducerConfig {
                 JsonSerializer.class
         );
 
-        return new DefaultKafkaProducerFactory<>(properties);
+        return properties;
     }
 
     @Bean
-    public KafkaTemplate<String, SettlementCreatedEvent> kafkaTemplate(
+    public ProducerFactory<String, SettlementCreatedEvent>
+    settlementProducerFactory() {
+
+        return new DefaultKafkaProducerFactory<>(
+                producerProperties()
+        );
+    }
+
+    @Bean
+    public KafkaTemplate<String, SettlementCreatedEvent>
+    settlementKafkaTemplate(
             ProducerFactory<String, SettlementCreatedEvent> producerFactory) {
+
+        return new KafkaTemplate<>(producerFactory);
+    }
+
+    @Bean
+    public ProducerFactory<String, TransactionCreatedEvent>
+    transactionProducerFactory() {
+
+        return new DefaultKafkaProducerFactory<>(
+                producerProperties()
+        );
+    }
+
+    @Bean
+    public KafkaTemplate<String, TransactionCreatedEvent>
+    transactionKafkaTemplate(
+            ProducerFactory<String, TransactionCreatedEvent> producerFactory) {
 
         return new KafkaTemplate<>(producerFactory);
     }

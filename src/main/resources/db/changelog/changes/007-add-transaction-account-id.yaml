@@ -1,0 +1,15 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 007-add-transaction-account-id
+      author: settleflow
+
+      changes:
+        - addColumn:
+            tableName: transactions
+            columns:
+              - column:
+                  name: account_id
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
