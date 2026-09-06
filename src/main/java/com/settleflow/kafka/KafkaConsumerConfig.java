@@ -1,14 +1,20 @@
 package com.settleflow.kafka;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,10 +30,13 @@ public class KafkaConsumerConfig {
     public ConsumerFactory<String, TransactionCreatedEvent>
     transactionConsumerFactory() {
 
-        JsonDeserializer<TransactionCreatedEvent> deserializer =
+        JsonDeserializer<TransactionCreatedEvent> jsonDeserializer =
                 new JsonDeserializer<>(TransactionCreatedEvent.class);
 
-        deserializer.addTrustedPackages("com.settleflow.kafka");
+        jsonDeserializer.addTrustedPackages("com.settleflow.kafka");
+
+        ErrorHandlingDeserializer<TransactionCreatedEvent> deserializer =
+                new ErrorHandlingDeserializer<>(jsonDeserializer);
 
         Map<String, Object> properties = new HashMap<>();
 
@@ -48,7 +57,7 @@ public class KafkaConsumerConfig {
 
         properties.put(
                 ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                JsonDeserializer.class
+                ErrorHandlingDeserializer.class
         );
 
         return new DefaultKafkaConsumerFactory<>(
@@ -58,19 +67,71 @@ public class KafkaConsumerConfig {
         );
     }
 
+
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, TransactionCreatedEvent>
     transactionKafkaListenerContainerFactory(
-            ConsumerFactory<String, TransactionCreatedEvent> consumerFactory) {
+            ConsumerFactory<String, TransactionCreatedEvent> consumerFactory,
+            KafkaTemplate<String, TransactionCreatedEvent> kafkaTemplate) {
 
         ConcurrentKafkaListenerContainerFactory<String, TransactionCreatedEvent>
                 factory = new ConcurrentKafkaListenerContainerFactory<>();
 
         factory.setConsumerFactory(consumerFactory);
 
+        // ========================================================
+        // Manual acknowledgment
+        // ========================================================
+
         factory.getContainerProperties().setAckMode(
                 ContainerProperties.AckMode.MANUAL
         );
+
+        // ========================================================
+        // Dead Letter Publishing Recoverer
+        // ========================================================
+
+        DeadLetterPublishingRecoverer recoverer =
+                new DeadLetterPublishingRecoverer(
+                        kafkaTemplate,
+                        (record, exception) ->
+                                new TopicPartition(
+                                        record.topic() + ".DLQ",
+                                        record.partition()
+                                )
+                );
+
+        // ========================================================
+        // Kafka retry configuration
+        //
+        // Original attempt
+        //      ↓
+        // Retry 1
+        //      ↓ 1 second
+        // Retry 2
+        //      ↓ 1 second
+        // Retry 3
+        //      ↓
+        // DLQ
+        // ========================================================
+
+        FixedBackOff backOff =
+                new FixedBackOff(
+                        1000L,
+                        3L
+                );
+
+        // ========================================================
+        // Error Handler
+        // ========================================================
+
+        DefaultErrorHandler errorHandler =
+                new DefaultErrorHandler(
+                        recoverer,
+                        backOff
+                );
+
+        factory.setCommonErrorHandler(errorHandler);
 
         return factory;
     }
@@ -117,6 +178,7 @@ public class KafkaConsumerConfig {
                 deserializer
         );
     }
+
 
     @Bean(name = "kafkaListenerContainerFactory")
     public ConcurrentKafkaListenerContainerFactory<String, SettlementCreatedEvent>

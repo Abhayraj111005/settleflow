@@ -26,3 +26,10 @@ kafka:
     consumer:
       group-id: settleflow-test-group
       auto-offset-reset: earliest
+
+
+logging:
+  level:
+    org.springframework.kafka.listener.DefaultErrorHandler: DEBUG
+    org.springframework.kafka.listener.SeekUtils: DEBUG
+    org.springframework.kafka.listener.DeadLetterPublishingRecoverer: DEBUG

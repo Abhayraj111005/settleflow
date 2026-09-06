@@ -1,11 +1,13 @@
 package com.settleflow.kafka;
 
 import com.settleflow.entity.ProcessedEvent;
+import com.settleflow.entity.Transaction;
 import com.settleflow.repository.ProcessedEventRepository;
-import org.springframework.dao.DataIntegrityViolationException;
+import com.settleflow.repository.TransactionRepository;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -13,12 +15,17 @@ import java.time.LocalDateTime;
 public class TransactionCreatedConsumer {
 
     private final ProcessedEventRepository processedEventRepository;
+    private final TransactionRepository transactionRepository;
 
     public TransactionCreatedConsumer(
-            ProcessedEventRepository processedEventRepository) {
+            ProcessedEventRepository processedEventRepository,
+            TransactionRepository transactionRepository) {
+
         this.processedEventRepository = processedEventRepository;
+        this.transactionRepository = transactionRepository;
     }
 
+    @Transactional
     @KafkaListener(
             topics = "settlement.transactions.created",
             groupId = "settlement-transaction-consumer-group",
@@ -36,27 +43,65 @@ public class TransactionCreatedConsumer {
                 "Processing event: " + event.eventId()
         );
 
-        ProcessedEvent processedEvent = new ProcessedEvent();
+        // ========================================================
+        // Idempotency check
+        // ========================================================
 
-        processedEvent.setEventId(event.eventId());
-        processedEvent.setProcessedAt(LocalDateTime.now());
-
-        try {
-
-            saveWithRetry(processedEvent);
-
-            System.out.println(
-                    "Event persisted successfully: "
-                            + event.eventId()
-            );
-
-        } catch (DataIntegrityViolationException e) {
+        if (processedEventRepository.existsByEventId(event.eventId())) {
 
             System.out.println(
                     "Duplicate event detected. Skipping: "
                             + event.eventId()
             );
+
+            acknowledgment.acknowledge();
+
+            return;
         }
+
+        // ========================================================
+        // Create ProcessedEvent record
+        // ========================================================
+
+        ProcessedEvent processedEvent = new ProcessedEvent();
+
+        processedEvent.setEventId(event.eventId());
+        processedEvent.setProcessedAt(LocalDateTime.now());
+
+        // ========================================================
+        // Persist ProcessedEvent
+        // ========================================================
+
+        saveWithRetry(processedEvent);
+
+        // ========================================================
+        // Create Transaction
+        // ========================================================
+
+        Transaction transaction = new Transaction();
+
+        transaction.setId(event.transactionId());
+        transaction.setSettlementId(event.settlementId());
+        transaction.setAccountId(event.accountId());
+        transaction.setMerchantId(event.merchantId());
+        transaction.setAmount(event.amount());
+        transaction.setStatus(event.status());
+        transaction.setIdempotencyKey(event.idempotencyKey());
+        transaction.setCreatedAt(event.createdAt());
+
+        // ========================================================
+        // Persist Transaction
+        // ========================================================
+
+        transactionRepository.saveAndFlush(transaction);
+        System.out.println(
+                "Transaction persisted successfully: "
+                        + event.transactionId()
+        );
+
+        // ========================================================
+        // Acknowledge Kafka message
+        // ========================================================
 
         acknowledgment.acknowledge();
     }
@@ -74,37 +119,34 @@ public class TransactionCreatedConsumer {
 
                 return;
 
-            } catch (DataIntegrityViolationException e) {
-
-                // Duplicate event.
-                // Do not retry because the database
-                // has already told us this event exists.
-                throw e;
-
             } catch (Exception e) {
 
-              if (attempt == maxAttempts) {
-    throw e;
-}
+                if (attempt == maxAttempts) {
+                    throw e;
+                }
 
-System.out.println(
-        "Database write failed. Retrying attempt "
-                + (attempt + 1)
-                + " after "
-                + backoffMillis
-                + "ms"
-);
+                System.out.println(
+                        "Database write failed. Retrying attempt "
+                                + (attempt + 1)
+                                + " after "
+                                + backoffMillis
+                                + "ms"
+                );
 
-try {
-    Thread.sleep(backoffMillis);
-} catch (InterruptedException interruptedException) {
-    Thread.currentThread().interrupt();
+                try {
 
-    throw new RuntimeException(interruptedException);
-}
+                    Thread.sleep(backoffMillis);
 
-backoffMillis *= 2;
+                } catch (InterruptedException interruptedException) {
 
+                    Thread.currentThread().interrupt();
+
+                    throw new RuntimeException(
+                            interruptedException
+                    );
+                }
+
+                backoffMillis *= 2;
             }
         }
     }
