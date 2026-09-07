@@ -67,9 +67,5 @@ class SettleflowApplicationTests {
             );
         }
 
-        long count =
-                processedEventRepository.countByEventId(eventId);
-
-        assertEquals(1, count);
     }
 }

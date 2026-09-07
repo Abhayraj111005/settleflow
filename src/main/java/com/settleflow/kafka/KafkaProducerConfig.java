@@ -37,6 +37,10 @@ public class KafkaProducerConfig {
         return properties;
     }
 
+    // ---------------------------------------------------------
+    // Settlement Created Event
+    // ---------------------------------------------------------
+
     @Bean
     public ProducerFactory<String, SettlementCreatedEvent>
     settlementProducerFactory() {
@@ -53,6 +57,31 @@ public class KafkaProducerConfig {
 
         return new KafkaTemplate<>(producerFactory);
     }
+
+    // ---------------------------------------------------------
+    // Settlement Status Updated Event
+    // ---------------------------------------------------------
+
+    @Bean
+    public ProducerFactory<String, SettlementStatusUpdatedEvent>
+    settlementStatusUpdatedProducerFactory() {
+
+        return new DefaultKafkaProducerFactory<>(
+                producerProperties()
+        );
+    }
+
+    @Bean
+    public KafkaTemplate<String, SettlementStatusUpdatedEvent>
+    settlementStatusUpdatedKafkaTemplate(
+            ProducerFactory<String, SettlementStatusUpdatedEvent> producerFactory) {
+
+        return new KafkaTemplate<>(producerFactory);
+    }
+
+    // ---------------------------------------------------------
+    // Transaction Created Event
+    // ---------------------------------------------------------
 
     @Bean
     public ProducerFactory<String, TransactionCreatedEvent>

@@ -20,8 +20,9 @@ public class Settlement {
     @Column(name = "amount", nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
 
-    @Column(name = "status", nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+@Column(name = "status", nullable = false)
+private SettlementStatus status;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -50,13 +51,39 @@ public class Settlement {
         this.amount = amount;
     }
 
-    public String getStatus() {
-        return status;
+    public SettlementStatus getStatus() {
+    return status;
+}
+
+public void transitionTo(SettlementStatus newStatus) {
+
+    if (!isValidTransition(this.status, newStatus)) {
+        throw new InvalidSettlementStateTransitionException(
+                this.status,
+                newStatus
+        );
     }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
+    this.status = newStatus;
+}
+
+private boolean isValidTransition(
+        SettlementStatus current,
+        SettlementStatus next) {
+
+    return switch (current) {
+
+        case PENDING ->
+                next == SettlementStatus.PROCESSING;
+
+        case PROCESSING ->
+                next == SettlementStatus.COMPLETED
+                        || next == SettlementStatus.FAILED;
+
+        case COMPLETED, FAILED ->
+                false;
+    };
+}
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
@@ -65,4 +92,7 @@ public class Settlement {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+    public Settlement() {
+    this.status = SettlementStatus.PENDING;
+}
 }
