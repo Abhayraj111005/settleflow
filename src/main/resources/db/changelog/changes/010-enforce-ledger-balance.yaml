@@ -1,0 +1,110 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 010-enforce-ledger-balance
+      author: settleflow
+
+      changes:
+
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION validate_ledger_entry_balance()
+              RETURNS TRIGGER
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  ledger_count INTEGER;
+                  debit_count INTEGER;
+                  credit_count INTEGER;
+                  debit_amount NUMERIC(19,4);
+                  credit_amount NUMERIC(19,4);
+              BEGIN
+
+                  SELECT COUNT(*)
+                  INTO ledger_count
+                  FROM ledger_entries
+                  WHERE transaction_id = NEW.transaction_id;
+
+                  SELECT COUNT(*)
+                  INTO debit_count
+                  FROM ledger_entries
+                  WHERE transaction_id = NEW.transaction_id
+                    AND entry_type = 'DEBIT';
+
+                  SELECT COUNT(*)
+                  INTO credit_count
+                  FROM ledger_entries
+                  WHERE transaction_id = NEW.transaction_id
+                    AND entry_type = 'CREDIT';
+
+                  SELECT COALESCE(
+                      SUM(
+                          CASE
+                              WHEN entry_type = 'DEBIT'
+                              THEN amount
+                              ELSE 0
+                          END
+                      ),
+                      0
+                  )
+                  INTO debit_amount
+                  FROM ledger_entries
+                  WHERE transaction_id = NEW.transaction_id;
+
+                  SELECT COALESCE(
+                      SUM(
+                          CASE
+                              WHEN entry_type = 'CREDIT'
+                              THEN amount
+                              ELSE 0
+                          END
+                      ),
+                      0
+                  )
+                  INTO credit_amount
+                  FROM ledger_entries
+                  WHERE transaction_id = NEW.transaction_id;
+
+                  IF ledger_count <> 2 THEN
+                      RAISE EXCEPTION
+                          'Transaction % must have exactly 2 ledger entries, found %',
+                          NEW.transaction_id,
+                          ledger_count;
+                  END IF;
+
+                  IF debit_count <> 1 THEN
+                      RAISE EXCEPTION
+                          'Transaction % must have exactly 1 DEBIT entry, found %',
+                          NEW.transaction_id,
+                          debit_count;
+                  END IF;
+
+                  IF credit_count <> 1 THEN
+                      RAISE EXCEPTION
+                          'Transaction % must have exactly 1 CREDIT entry, found %',
+                          NEW.transaction_id,
+                          credit_count;
+                  END IF;
+
+                  IF debit_amount <> credit_amount THEN
+                      RAISE EXCEPTION
+                          'Transaction % is unbalanced: debit=%, credit=%',
+                          NEW.transaction_id,
+                          debit_amount,
+                          credit_amount;
+                  END IF;
+
+                  RETURN NEW;
+              END;
+              $$;
+
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE CONSTRAINT TRIGGER ledger_entry_balance_constraint
+              AFTER INSERT OR UPDATE OR DELETE
+              ON ledger_entries
+              DEFERRABLE INITIALLY DEFERRED
+              FOR EACH ROW
+              EXECUTE FUNCTION validate_ledger_entry_balance();
