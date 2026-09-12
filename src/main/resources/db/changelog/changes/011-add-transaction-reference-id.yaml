@@ -1,0 +1,30 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 011-add-transaction-reference-id
+      author: settleflow
+
+      changes:
+
+        - addColumn:
+            tableName: transactions
+            columns:
+              - column:
+                  name: reference_id
+                  type: VARCHAR(255)
+
+        - sql:
+            sql: >
+              UPDATE transactions
+              SET reference_id = 'LEGACY-' || id::text
+              WHERE reference_id IS NULL;
+
+        - addNotNullConstraint:
+            tableName: transactions
+            columnName: reference_id
+            columnDataType: VARCHAR(255)
+
+        - addUniqueConstraint:
+            tableName: transactions
+            columnNames: reference_id
+            constraintName: uk_transactions_reference_id

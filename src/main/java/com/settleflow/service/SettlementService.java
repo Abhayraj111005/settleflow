@@ -47,6 +47,7 @@ public class SettlementService {
         // New settlement automatically starts as PENDING
         Settlement settlement = new Settlement();
 
+        settlement.setId(UUID.randomUUID());
         settlement.setMerchantId(merchantId);
         settlement.setAmount(amount);
         settlement.setCreatedAt(LocalDateTime.now());

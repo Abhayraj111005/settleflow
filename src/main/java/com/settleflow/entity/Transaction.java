@@ -33,6 +33,9 @@ public class Transaction {
     @Column(name = "account_id", nullable = false)
     private String accountId;
 
+    @Column(name = "reference_id", nullable = false)
+    private String referenceId;
+
     public UUID getId() {
         return id;
     }
@@ -95,5 +98,12 @@ public class Transaction {
 
     public void setAccountId(String accountId) {
         this.accountId = accountId;
+    }
+    public String getReferenceId() {
+    return referenceId;
+    }
+
+    public void setReferenceId(String referenceId) {
+        this.referenceId = referenceId;
     }
 }
