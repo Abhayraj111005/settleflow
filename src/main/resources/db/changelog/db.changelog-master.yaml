@@ -22,7 +22,7 @@ databaseChangeLog:
       file: db/changelog/changes/007-add-transaction-account-id.yaml
 
   - include:
-        file: db/changelog/changes/008-create-processed-events-table.yaml
+      file: db/changelog/changes/008-create-processed-events-table.yaml
 
   - include:
       file: db/changelog/changes/009-add-ledger-entry-constraints.yaml
@@ -32,3 +32,12 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/changes/011-add-transaction-reference-id.yaml
+
+  - include:
+      file: db/changelog/changes/012-create-reconciliation-exceptions-table.yaml
+
+  - include:
+      file: db/changelog/changes/013-add-reconciliation-batch-id-to-transactions.yaml
+
+  - include: 
+      file: db/changelog/changes/014-add-batch-id-to-reconciliation-exceptions.yaml

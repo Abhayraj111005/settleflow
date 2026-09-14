@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-add-batch-id-to-reconciliation-exceptions
+      author: settleflow
+
+      changes:
+
+        - addColumn:
+            tableName: reconciliation_exceptions
+            columns:
+              - column:
+                  name: batch_id
+                  type: VARCHAR(255)
+
+        - sql:
+            sql: |
+              UPDATE reconciliation_exceptions
+              SET batch_id = 'LEGACY-' || id::text
+              WHERE batch_id IS NULL;
+
+        - addNotNullConstraint:
+            tableName: reconciliation_exceptions
+            columnName: batch_id
+            columnDataType: VARCHAR(255)
+
+        - addUniqueConstraint:
+            tableName: reconciliation_exceptions
+            columnNames: batch_id, reference_id, exception_type
+            constraintName: uk_reconciliation_exception_batch_reference_type

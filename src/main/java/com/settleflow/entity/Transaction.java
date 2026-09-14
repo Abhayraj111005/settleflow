@@ -36,6 +36,9 @@ public class Transaction {
     @Column(name = "reference_id", nullable = false)
     private String referenceId;
 
+    @Column(name = "reconciliation_batch_id")
+    private String reconciliationBatchId;
+
     public UUID getId() {
         return id;
     }
@@ -99,11 +102,20 @@ public class Transaction {
     public void setAccountId(String accountId) {
         this.accountId = accountId;
     }
+
     public String getReferenceId() {
-    return referenceId;
+        return referenceId;
     }
 
     public void setReferenceId(String referenceId) {
         this.referenceId = referenceId;
+    }
+
+    public String getReconciliationBatchId() {
+        return reconciliationBatchId;
+    }
+
+    public void setReconciliationBatchId(String reconciliationBatchId) {
+        this.reconciliationBatchId = reconciliationBatchId;
     }
 }

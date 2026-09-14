@@ -1,0 +1,49 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 012-create-reconciliation-exceptions-table
+      author: abhay
+
+      changes:
+
+        - createTable:
+            tableName: reconciliation_exceptions
+
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: transaction_id
+                  type: UUID
+
+              - column:
+                  name: reference_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: exception_type
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: internal_amount
+                  type: NUMERIC(19,4)
+
+              - column:
+                  name: external_amount
+                  type: NUMERIC(19,4)
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false

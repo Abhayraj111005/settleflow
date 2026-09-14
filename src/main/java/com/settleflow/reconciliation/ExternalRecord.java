@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 
 public class ExternalRecord {
 
+    private String batchId;
+
     private String referenceId;
 
     private BigDecimal amount;
@@ -14,6 +16,7 @@ public class ExternalRecord {
     public ExternalRecord() {
     }
 
+    // Backward-compatible constructor
     public ExternalRecord(
             String referenceId,
             BigDecimal amount,
@@ -22,6 +25,27 @@ public class ExternalRecord {
         this.referenceId = referenceId;
         this.amount = amount;
         this.timestamp = timestamp;
+    }
+
+    // Batch-aware constructor
+    public ExternalRecord(
+            String batchId,
+            String referenceId,
+            BigDecimal amount,
+            LocalDateTime timestamp) {
+
+        this.batchId = batchId;
+        this.referenceId = referenceId;
+        this.amount = amount;
+        this.timestamp = timestamp;
+    }
+
+    public String getBatchId() {
+        return batchId;
+    }
+
+    public void setBatchId(String batchId) {
+        this.batchId = batchId;
     }
 
     public String getReferenceId() {
