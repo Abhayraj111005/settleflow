@@ -23,6 +23,7 @@ import java.util.UUID;
 public class ReconciliationException {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "batch_id", nullable = false)
@@ -37,14 +38,23 @@ public class ReconciliationException {
     @Column(name = "exception_type", nullable = false)
     private String exceptionType;
 
-    @Column(name = "internal_amount", precision = 19, scale = 4)
+    @Column(
+            name = "internal_amount",
+            precision = 19,
+            scale = 4
+    )
     private BigDecimal internalAmount;
 
-    @Column(name = "external_amount", precision = 19, scale = 4)
+    @Column(
+            name = "external_amount",
+            precision = 19,
+            scale = 4
+    )
     private BigDecimal externalAmount;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
 
     public UUID getId() {
         return id;
@@ -54,6 +64,7 @@ public class ReconciliationException {
         this.id = id;
     }
 
+
     public String getBatchId() {
         return batchId;
     }
@@ -61,6 +72,7 @@ public class ReconciliationException {
     public void setBatchId(String batchId) {
         this.batchId = batchId;
     }
+
 
     public UUID getTransactionId() {
         return transactionId;
@@ -70,6 +82,7 @@ public class ReconciliationException {
         this.transactionId = transactionId;
     }
 
+
     public String getReferenceId() {
         return referenceId;
     }
@@ -77,6 +90,7 @@ public class ReconciliationException {
     public void setReferenceId(String referenceId) {
         this.referenceId = referenceId;
     }
+
 
     public String getExceptionType() {
         return exceptionType;
@@ -86,6 +100,7 @@ public class ReconciliationException {
         this.exceptionType = exceptionType;
     }
 
+
     public BigDecimal getInternalAmount() {
         return internalAmount;
     }
@@ -94,6 +109,7 @@ public class ReconciliationException {
         this.internalAmount = internalAmount;
     }
 
+
     public BigDecimal getExternalAmount() {
         return externalAmount;
     }
@@ -101,6 +117,7 @@ public class ReconciliationException {
     public void setExternalAmount(BigDecimal externalAmount) {
         this.externalAmount = externalAmount;
     }
+
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

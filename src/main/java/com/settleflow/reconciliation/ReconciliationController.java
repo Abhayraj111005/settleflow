@@ -12,16 +12,13 @@ public class ReconciliationController {
 
     public ReconciliationController(
             ReconciliationService reconciliationService) {
-
         this.reconciliationService = reconciliationService;
     }
 
     @PostMapping
-    public List<ReconciliationResult> reconcile(
+    public ReconciliationResponse reconcile(
             @RequestBody List<ExternalRecord> externalRecords) {
 
-        return reconciliationService.reconcile(
-                externalRecords
-        );
+        return reconciliationService.reconcile(externalRecords);
     }
 }

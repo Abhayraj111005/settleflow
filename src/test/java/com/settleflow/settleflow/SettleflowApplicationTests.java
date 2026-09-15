@@ -394,18 +394,21 @@ class SettleflowApplicationTests {
             throws Exception {
 
         /*
-         * Every execution gets a unique suffix because
-         * transactions.reference_id has a UNIQUE constraint.
+         * ---------------------------------------------------------
+         * UNIQUE TEST RUN
+         * ---------------------------------------------------------
          */
+
         String testRunId =
                 UUID.randomUUID().toString();
 
+
         /*
-         * One explicit reconciliation batch.
-         *
-         * Internal transactions and external records belonging
-         * to this reconciliation run must use the same batch ID.
+         * ---------------------------------------------------------
+         * RECONCILIATION BATCH
+         * ---------------------------------------------------------
          */
+
         String batchId =
                 "BATCH-RECON-" + testRunId;
 
@@ -549,11 +552,60 @@ class SettleflowApplicationTests {
 
 
                 /*
-                 * MATCHED
+                 * -------------------------------------------------
+                 * VERIFY RECONCILIATION SUMMARY
+                 * -------------------------------------------------
+                 *
+                 * Manually calculated:
+                 *
+                 * MATCHED:
+                 *   100.00
+                 *
+                 * MISMATCHED:
+                 *   200.00 vs 150.00
+                 *
+                 * UNMATCHED:
+                 *   INTERNAL ONLY
+                 *   EXTERNAL ONLY
+                 *
+                 * Therefore:
+                 *
+                 * totalMatched         = 1
+                 * totalMismatched      = 1
+                 * totalUnmatched       = 2
+                 * totalValueReconciled = 100.00
                  */
+
+                .andExpect(
+                        jsonPath("$.summary.totalMatched")
+                                .value(1)
+                )
+
+                .andExpect(
+                        jsonPath("$.summary.totalMismatched")
+                                .value(1)
+                )
+
+                .andExpect(
+                        jsonPath("$.summary.totalUnmatched")
+                                .value(2)
+                )
+
+                .andExpect(
+                        jsonPath("$.summary.totalValueReconciled")
+                                .value(100.00)
+                )
+
+
+                /*
+                 * -------------------------------------------------
+                 * VERIFY MATCHED
+                 * -------------------------------------------------
+                 */
+
                 .andExpect(
                         jsonPath(
-                                "$[?(@.referenceId == '" +
+                                "$.results[?(@.referenceId == '" +
                                         matchedReference +
                                         "')].status"
                         ).value(
@@ -565,11 +617,14 @@ class SettleflowApplicationTests {
 
 
                 /*
-                 * AMOUNT MISMATCH
+                 * -------------------------------------------------
+                 * VERIFY AMOUNT MISMATCH
+                 * -------------------------------------------------
                  */
+
                 .andExpect(
                         jsonPath(
-                                "$[?(@.referenceId == '" +
+                                "$.results[?(@.referenceId == '" +
                                         mismatchReference +
                                         "')].status"
                         ).value(
@@ -581,11 +636,14 @@ class SettleflowApplicationTests {
 
 
                 /*
-                 * INTERNAL ONLY
+                 * -------------------------------------------------
+                 * VERIFY INTERNAL ONLY
+                 * -------------------------------------------------
                  */
+
                 .andExpect(
                         jsonPath(
-                                "$[?(@.referenceId == '" +
+                                "$.results[?(@.referenceId == '" +
                                         internalOnlyReference +
                                         "')].status"
                         ).value(
@@ -597,11 +655,14 @@ class SettleflowApplicationTests {
 
 
                 /*
-                 * EXTERNAL ONLY
+                 * -------------------------------------------------
+                 * VERIFY EXTERNAL ONLY
+                 * -------------------------------------------------
                  */
+
                 .andExpect(
                         jsonPath(
-                                "$[?(@.referenceId == '" +
+                                "$.results[?(@.referenceId == '" +
                                         externalOnlyReference +
                                         "')].status"
                         ).value(
@@ -616,17 +677,6 @@ class SettleflowApplicationTests {
          * ---------------------------------------------------------
          * VERIFY MATCHED TRANSACTION WAS PERSISTED
          * ---------------------------------------------------------
-         *
-         * Before reconciliation:
-         *
-         *     status = PENDING
-         *
-         * After reconciliation:
-         *
-         *     status = MATCHED
-         *
-         * We reload the transaction from PostgreSQL instead of
-         * checking the Java object in memory.
          */
 
         Transaction persistedMatchedTransaction =

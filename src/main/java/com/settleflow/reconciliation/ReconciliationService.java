@@ -4,12 +4,12 @@ import com.settleflow.entity.ReconciliationException;
 import com.settleflow.entity.Transaction;
 import com.settleflow.repository.ReconciliationExceptionRepository;
 import com.settleflow.repository.TransactionRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ReconciliationService {
@@ -17,39 +17,32 @@ public class ReconciliationService {
     private final TransactionRepository transactionRepository;
     private final ReconciliationExceptionRepository reconciliationExceptionRepository;
     private final ReconciliationMatcher reconciliationMatcher;
+    private final ReconciliationSummaryCalculator reconciliationSummaryCalculator;
 
     public ReconciliationService(
             TransactionRepository transactionRepository,
             ReconciliationExceptionRepository reconciliationExceptionRepository,
-            ReconciliationMatcher reconciliationMatcher) {
+            ReconciliationMatcher reconciliationMatcher,
+            ReconciliationSummaryCalculator reconciliationSummaryCalculator) {
 
         this.transactionRepository = transactionRepository;
         this.reconciliationExceptionRepository =
                 reconciliationExceptionRepository;
         this.reconciliationMatcher = reconciliationMatcher;
+        this.reconciliationSummaryCalculator =
+                reconciliationSummaryCalculator;
     }
 
     @Transactional
-    public List<ReconciliationResult> reconcile(
-            List<ExternalRecord> externalRecords) {
+    public ReconciliationResponse reconcile(
+        List<ExternalRecord> externalRecords){ 
 
         validateBatch(externalRecords);
 
         String batchId = externalRecords.get(0).getBatchId();
 
-        /*
-         * IMPORTANT:
-         *
-         * We deliberately DO NOT use:
-         *
-         * transactionRepository.findAll()
-         *
-         * because that would compare this external batch
-         * against every historical transaction.
-         */
         List<Transaction> internalTransactions =
-                transactionRepository
-                        .findByReconciliationBatchId(batchId);
+                transactionRepository.findByReconciliationBatchId(batchId);
 
         List<ReconciliationResult> results =
                 reconciliationMatcher.reconcile(
@@ -57,44 +50,38 @@ public class ReconciliationService {
                         externalRecords
                 );
 
+        /*
+         * Calculate the batch-level reconciliation summary.
+         *
+         * The summary is intentionally calculated inside the service because
+         * reconciliation is the business use case owned by this service.
+         *
+         * The API still returns the existing List<ReconciliationResult>
+         * for now. We will expose the summary through the API in a later step.
+         */
+        ReconciliationSummary summary =
+                reconciliationSummaryCalculator.calculate(results);
+
         for (ReconciliationResult result : results) {
 
-            if (result.getStatus() ==
-                    ReconciliationStatus.MATCHED) {
-
+            if (result.getStatus() == ReconciliationStatus.MATCHED) {
                 markMatched(result);
 
             } else if (
-                    result.getStatus() ==
-                            ReconciliationStatus.AMOUNT_MISMATCH
-                            ||
-                    result.getStatus() ==
-                            ReconciliationStatus.UNMATCHED) {
+                    result.getStatus() == ReconciliationStatus.AMOUNT_MISMATCH
+                            || result.getStatus() == ReconciliationStatus.UNMATCHED) {
 
-                persistExceptionIfNeeded(
-                        batchId,
-                        result
-                );
+                persistExceptionIfNeeded(batchId, result);
             }
         }
 
-        return results;
+       return new ReconciliationResponse(summary, results);
     }
 
-    private void markMatched(
-            ReconciliationResult result) {
+    private void markMatched(ReconciliationResult result) {
 
         Transaction transaction =
                 result.getInternalTransaction();
-
-        /*
-         * MATCHED result always has an internal transaction.
-         */
-        if (transaction == null) {
-            throw new IllegalStateException(
-                    "MATCHED result must contain an internal transaction"
-            );
-        }
 
         transaction.setStatus("MATCHED");
 
@@ -105,20 +92,16 @@ public class ReconciliationService {
             String batchId,
             ReconciliationResult result) {
 
+        String referenceId = result.getReferenceId();
+
         String exceptionType =
                 result.getStatus().name();
 
-        /*
-         * Application-level idempotency check.
-         *
-         * The database UNIQUE constraint is the final
-         * concurrency safety net.
-         */
         boolean alreadyExists =
                 reconciliationExceptionRepository
                         .findByBatchIdAndReferenceIdAndExceptionType(
                                 batchId,
-                                result.getReferenceId(),
+                                referenceId,
                                 exceptionType
                         )
                         .isPresent();
@@ -128,98 +111,67 @@ public class ReconciliationService {
         }
 
         ReconciliationException exception =
-                buildException(
-                        batchId,
-                        result
-                );
-
-        reconciliationExceptionRepository.save(
-                exception
-        );
-    }
-
-    private ReconciliationException buildException(
-            String batchId,
-            ReconciliationResult result) {
-
-        ReconciliationException exception =
                 new ReconciliationException();
 
-        exception.setId(UUID.randomUUID());
-
         exception.setBatchId(batchId);
+        exception.setReferenceId(referenceId);
+        exception.setExceptionType(exceptionType);
 
-        exception.setReferenceId(
-                result.getReferenceId()
-        );
+        Transaction internalTransaction =
+                result.getInternalTransaction();
 
-        exception.setExceptionType(
-                result.getStatus().name()
-        );
-
-        if (result.getInternalTransaction() != null) {
-
+        if (internalTransaction != null) {
             exception.setTransactionId(
-                    result.getInternalTransaction().getId()
+                    internalTransaction.getId()
             );
 
             exception.setInternalAmount(
-                    result.getInternalTransaction().getAmount()
+                    internalTransaction.getAmount()
             );
         }
 
-        if (result.getExternalRecord() != null) {
+        ExternalRecord externalRecord =
+                result.getExternalRecord();
 
+        if (externalRecord != null) {
             exception.setExternalAmount(
-                    result.getExternalRecord().getAmount()
+                    externalRecord.getAmount()
             );
         }
 
-        exception.setCreatedAt(
-                LocalDateTime.now()
-        );
+        exception.setCreatedAt(LocalDateTime.now());
 
-        return exception;
+        reconciliationExceptionRepository.save(exception);
     }
 
     private void validateBatch(
             List<ExternalRecord> externalRecords) {
 
-        if (externalRecords == null ||
-                externalRecords.isEmpty()) {
-
+        if (externalRecords == null || externalRecords.isEmpty()) {
             throw new IllegalArgumentException(
-                    "External reconciliation batch cannot be empty"
+                    "External reconciliation batch cannot be null or empty"
             );
         }
 
         String batchId =
                 externalRecords.get(0).getBatchId();
 
-        if (batchId == null ||
-                batchId.isBlank()) {
-
+        if (batchId == null || batchId.isBlank()) {
             throw new IllegalArgumentException(
-                    "Reconciliation batchId is required"
+                    "Batch ID cannot be null or blank"
             );
         }
 
-        /*
-         * Every external record in one API request
-         * must belong to the same batch.
-         */
         boolean containsDifferentBatch =
                 externalRecords.stream()
                         .anyMatch(record ->
-                                !batchId.equals(
-                                        record.getBatchId()
-                                )
+                                record.getBatchId() == null
+                                        || !batchId.equals(record.getBatchId())
                         );
 
         if (containsDifferentBatch) {
-
             throw new IllegalArgumentException(
-                    "All external records must belong to the same reconciliation batch"
+                    "All external records must belong to the same batch"
             );
         }
     }

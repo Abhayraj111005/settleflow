@@ -16,6 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.settleflow.reconciliation.ReconciliationSummary;
+import com.settleflow.reconciliation.ReconciliationSummaryCalculator;
+
 class ReconciliationMatcherTest {
 
     @Test
@@ -362,4 +365,152 @@ class ReconciliationMatcherTest {
                 .findFirst()
                 .orElseThrow();
     }
+
+
+    @Test
+    void shouldCalculateCorrectReconciliationSummary() {
+
+        /*
+         * ---------------------------------------------------------
+         * STEP 1: Create the same mock reconciliation batch
+         * ---------------------------------------------------------
+         *
+         * Internal:
+         *
+         * REF-MATCHED        = 100.00
+         * REF-MISMATCH       = 200.00
+         * REF-INTERNAL-ONLY  = 700.00
+         *
+         * External:
+         *
+         * REF-MATCHED        = 100.00
+         * REF-MISMATCH       = 150.00
+         * REF-EXTERNAL-ONLY  = 500.00
+         */
+
+        Transaction matchedTransaction =
+                createTransaction(
+                        "REF-MATCHED",
+                        "100.00"
+                );
+
+        Transaction mismatchTransaction =
+                createTransaction(
+                        "REF-MISMATCH",
+                        "200.00"
+                );
+
+        Transaction internalOnlyTransaction =
+                createTransaction(
+                        "REF-INTERNAL-ONLY",
+                        "700.00"
+                );
+
+        List<Transaction> internalTransactions =
+                List.of(
+                        matchedTransaction,
+                        mismatchTransaction,
+                        internalOnlyTransaction
+                );
+
+        ExternalRecord matchedExternalRecord =
+                createExternalRecord(
+                        "REF-MATCHED",
+                        "100.00"
+                );
+
+        ExternalRecord mismatchExternalRecord =
+                createExternalRecord(
+                        "REF-MISMATCH",
+                        "150.00"
+                );
+
+        ExternalRecord externalOnlyRecord =
+                createExternalRecord(
+                        "REF-EXTERNAL-ONLY",
+                        "500.00"
+                );
+
+        List<ExternalRecord> externalRecords =
+                List.of(
+                        matchedExternalRecord,
+                        mismatchExternalRecord,
+                        externalOnlyRecord
+                );
+
+
+        /*
+         * ---------------------------------------------------------
+         * STEP 2: Run the matcher
+         * ---------------------------------------------------------
+         */
+
+        ReconciliationMatcher matcher =
+                new ReconciliationMatcher();
+
+        List<ReconciliationResult> results =
+                matcher.reconcile(
+                        internalTransactions,
+                        externalRecords
+                );
+
+
+        /*
+         * ---------------------------------------------------------
+         * STEP 3: Calculate summary
+         * ---------------------------------------------------------
+         */
+
+        ReconciliationSummaryCalculator calculator =
+                new ReconciliationSummaryCalculator();
+
+        ReconciliationSummary summary =
+                calculator.calculate(results);
+
+
+        /*
+         * ---------------------------------------------------------
+         * STEP 4: Manually calculated expected result
+         * ---------------------------------------------------------
+         *
+         * MATCHED:
+         *   REF-MATCHED = 100.00
+         *
+         * MISMATCHED:
+         *   REF-MISMATCH = 200.00 vs 150.00
+         *
+         * UNMATCHED:
+         *   REF-EXTERNAL-ONLY
+         *   REF-INTERNAL-ONLY
+         *
+         * Therefore:
+         *
+         * totalMatched         = 1
+         * totalMismatched      = 1
+         * totalUnmatched       = 2
+         * totalValueReconciled = 100.00
+         */
+
+        assertEquals(
+                1,
+                summary.getTotalMatched()
+        );
+
+        assertEquals(
+                1,
+                summary.getTotalMismatched()
+        );
+
+        assertEquals(
+                2,
+                summary.getTotalUnmatched()
+        );
+
+        assertEquals(
+                0,
+                summary.getTotalValueReconciled()
+                        .compareTo(new BigDecimal("100.00"))
+        );
+    }
+
 }
