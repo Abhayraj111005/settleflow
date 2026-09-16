@@ -64,15 +64,17 @@ public class ReconciliationService {
 
         for (ReconciliationResult result : results) {
 
-            if (result.getStatus() == ReconciliationStatus.MATCHED) {
-                markMatched(result);
+          if (result.getStatus() == ReconciliationStatus.MATCHED
+        || result.getStatus() == ReconciliationStatus.PARTIAL_MATCH_RESOLVED) {
 
-            } else if (
-                    result.getStatus() == ReconciliationStatus.AMOUNT_MISMATCH
-                            || result.getStatus() == ReconciliationStatus.UNMATCHED) {
+    markMatched(result);
 
-                persistExceptionIfNeeded(batchId, result);
-            }
+} else if (
+        result.getStatus() == ReconciliationStatus.AMOUNT_MISMATCH
+                || result.getStatus() == ReconciliationStatus.UNMATCHED) {
+
+    persistExceptionIfNeeded(batchId, result);
+}
         }
 
        return new ReconciliationResponse(summary, results);

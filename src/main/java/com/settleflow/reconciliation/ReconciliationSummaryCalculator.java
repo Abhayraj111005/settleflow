@@ -17,30 +17,36 @@ public class ReconciliationSummaryCalculator {
 
         for (ReconciliationResult result : results) {
 
-            switch (result.getStatus()) {
+           switch (result.getStatus()) {
 
-                case MATCHED:
-                    summary.setTotalMatched(
-                            summary.getTotalMatched() + 1
-                    );
+    case MATCHED:
+        summary.setTotalMatched(
+                summary.getTotalMatched() + 1
+        );
 
-                    totalValueReconciled = totalValueReconciled.add(
-                            result.getInternalTransaction().getAmount()
-                    );
-                    break;
+        totalValueReconciled = totalValueReconciled.add(
+                result.getInternalTransaction().getAmount()
+        );
+        break;
 
-                case AMOUNT_MISMATCH:
-                    summary.setTotalMismatched(
-                            summary.getTotalMismatched() + 1
-                    );
-                    break;
+    case PARTIAL_MATCH_RESOLVED:
+        totalValueReconciled = totalValueReconciled.add(
+                result.getInternalTransaction().getAmount()
+        );
+        break;
 
-                case UNMATCHED:
-                    summary.setTotalUnmatched(
-                            summary.getTotalUnmatched() + 1
-                    );
-                    break;
-            }
+    case AMOUNT_MISMATCH:
+        summary.setTotalMismatched(
+                summary.getTotalMismatched() + 1
+        );
+        break;
+
+    case UNMATCHED:
+        summary.setTotalUnmatched(
+                summary.getTotalUnmatched() + 1
+        );
+        break;
+}
         }
 
         summary.setTotalValueReconciled(totalValueReconciled);

@@ -104,6 +104,63 @@ class ReconciliationSummaryCalculatorTest {
         );
     }
 
+    @Test
+void shouldIncludePartialMatchResolvedInReconciledValue() {
+
+    Transaction internalTransaction =
+            createTransaction(
+                    "REF-PARTIAL",
+                    "100.00"
+            );
+
+    ExternalRecord firstExternal =
+            new ExternalRecord(
+                    "REF-PARTIAL",
+                    new BigDecimal("60.00"),
+                    LocalDateTime.now()
+            );
+
+    ExternalRecord secondExternal =
+            new ExternalRecord(
+                    "REF-PARTIAL",
+                    new BigDecimal("40.00"),
+                    LocalDateTime.now()
+            );
+
+    ReconciliationResult partialResult =
+            createResult(
+                    "REF-PARTIAL",
+                    internalTransaction,
+                    firstExternal,
+                    ReconciliationStatus.PARTIAL_MATCH_RESOLVED
+            );
+
+    ReconciliationSummary summary =
+            calculator.calculate(
+                    List.of(partialResult)
+            );
+
+    assertEquals(
+            0,
+            summary.getTotalMatched()
+    );
+
+    assertEquals(
+            0,
+            summary.getTotalMismatched()
+    );
+
+    assertEquals(
+            0,
+            summary.getTotalUnmatched()
+    );
+
+    assertEquals(
+            new BigDecimal("100.00"),
+            summary.getTotalValueReconciled()
+    );
+}
+
     private ReconciliationResult createResult(
             String referenceId,
             Transaction internalTransaction,

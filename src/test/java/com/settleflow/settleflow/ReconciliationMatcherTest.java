@@ -5,6 +5,9 @@ import com.settleflow.reconciliation.ExternalRecord;
 import com.settleflow.reconciliation.ReconciliationMatcher;
 import com.settleflow.reconciliation.ReconciliationResult;
 import com.settleflow.reconciliation.ReconciliationStatus;
+import com.settleflow.reconciliation.ReconciliationSummary;
+import com.settleflow.reconciliation.ReconciliationSummaryCalculator;
+
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -13,11 +16,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-
-import com.settleflow.reconciliation.ReconciliationSummary;
-import com.settleflow.reconciliation.ReconciliationSummaryCalculator;
 
 class ReconciliationMatcherTest {
 
@@ -55,7 +56,6 @@ class ReconciliationMatcherTest {
                         internalOnlyTransaction
                 );
 
-
         /*
          * ---------------------------------------------------------
          * STEP 2: Create external bank records
@@ -87,7 +87,6 @@ class ReconciliationMatcherTest {
                         externalOnlyRecord
                 );
 
-
         /*
          * ---------------------------------------------------------
          * STEP 3: Run reconciliation
@@ -103,20 +102,10 @@ class ReconciliationMatcherTest {
                         externalRecords
                 );
 
-
         /*
          * ---------------------------------------------------------
          * STEP 4: Verify total result count
          * ---------------------------------------------------------
-         *
-         * We expect:
-         *
-         * REF-MATCHED
-         * REF-MISMATCH
-         * REF-EXTERNAL-ONLY
-         * REF-INTERNAL-ONLY
-         *
-         * Total = 4
          */
 
         assertEquals(
@@ -124,7 +113,6 @@ class ReconciliationMatcherTest {
                 results.size(),
                 "All matched, mismatched and orphan records must be returned"
         );
-
 
         /*
          * ---------------------------------------------------------
@@ -156,7 +144,6 @@ class ReconciliationMatcherTest {
                         "REF-INTERNAL-ONLY"
                 );
 
-
         /*
          * ---------------------------------------------------------
          * STEP 6: Verify MATCHED
@@ -180,7 +167,6 @@ class ReconciliationMatcherTest {
                 "REF-MATCHED",
                 matchedResult.getReferenceId()
         );
-
 
         /*
          * ---------------------------------------------------------
@@ -222,14 +208,10 @@ class ReconciliationMatcherTest {
                         .compareTo(new BigDecimal("150.00"))
         );
 
-
         /*
          * ---------------------------------------------------------
          * STEP 8: Verify EXTERNAL ORPHAN
          * ---------------------------------------------------------
-         *
-         * External record exists.
-         * Internal transaction does not exist.
          */
 
         assertEquals(
@@ -250,14 +232,10 @@ class ReconciliationMatcherTest {
                 externalOnlyResult.getReferenceId()
         );
 
-
         /*
          * ---------------------------------------------------------
          * STEP 9: Verify INTERNAL ORPHAN
          * ---------------------------------------------------------
-         *
-         * Internal transaction exists.
-         * External record does not exist.
          */
 
         assertEquals(
@@ -279,102 +257,16 @@ class ReconciliationMatcherTest {
         );
     }
 
-
     /*
      * -------------------------------------------------------------
-     * Helper method: Create internal Transaction
+     * Test: Reconciliation summary
      * -------------------------------------------------------------
      */
-
-    private Transaction createTransaction(
-            String referenceId,
-            String amount) {
-
-        Transaction transaction =
-                new Transaction();
-
-        transaction.setId(
-                UUID.randomUUID()
-        );
-
-        transaction.setReferenceId(
-                referenceId
-        );
-
-        transaction.setAmount(
-                new BigDecimal(amount)
-        );
-
-        transaction.setMerchantId(
-                "MERCHANT-001"
-        );
-
-        transaction.setAccountId(
-                "ACCOUNT-001"
-        );
-
-        transaction.setStatus(
-                "PENDING"
-        );
-
-        transaction.setIdempotencyKey(
-                "reconciliation-test-"
-                        + UUID.randomUUID()
-        );
-
-        transaction.setCreatedAt(
-                LocalDateTime.now()
-        );
-
-        return transaction;
-    }
-
-
-    /*
-     * -------------------------------------------------------------
-     * Helper method: Create external record
-     * -------------------------------------------------------------
-     */
-
-    private ExternalRecord createExternalRecord(
-            String referenceId,
-            String amount) {
-
-        return new ExternalRecord(
-                referenceId,
-                new BigDecimal(amount),
-                LocalDateTime.now()
-        );
-    }
-
-
-    /*
-     * -------------------------------------------------------------
-     * Helper method: Find result by reference ID
-     * -------------------------------------------------------------
-     */
-
-    private ReconciliationResult findResult(
-            List<ReconciliationResult> results,
-            String referenceId) {
-
-        return results.stream()
-                .filter(result ->
-                        result.getReferenceId()
-                                .equals(referenceId))
-                .findFirst()
-                .orElseThrow();
-    }
-
 
     @Test
     void shouldCalculateCorrectReconciliationSummary() {
 
         /*
-         * ---------------------------------------------------------
-         * STEP 1: Create the same mock reconciliation batch
-         * ---------------------------------------------------------
-         *
          * Internal:
          *
          * REF-MATCHED        = 100.00
@@ -438,11 +330,8 @@ class ReconciliationMatcherTest {
                         externalOnlyRecord
                 );
 
-
         /*
-         * ---------------------------------------------------------
-         * STEP 2: Run the matcher
-         * ---------------------------------------------------------
+         * Run matcher
          */
 
         ReconciliationMatcher matcher =
@@ -454,11 +343,8 @@ class ReconciliationMatcherTest {
                         externalRecords
                 );
 
-
         /*
-         * ---------------------------------------------------------
-         * STEP 3: Calculate summary
-         * ---------------------------------------------------------
+         * Calculate summary
          */
 
         ReconciliationSummaryCalculator calculator =
@@ -467,23 +353,8 @@ class ReconciliationMatcherTest {
         ReconciliationSummary summary =
                 calculator.calculate(results);
 
-
         /*
-         * ---------------------------------------------------------
-         * STEP 4: Manually calculated expected result
-         * ---------------------------------------------------------
-         *
-         * MATCHED:
-         *   REF-MATCHED = 100.00
-         *
-         * MISMATCHED:
-         *   REF-MISMATCH = 200.00 vs 150.00
-         *
-         * UNMATCHED:
-         *   REF-EXTERNAL-ONLY
-         *   REF-INTERNAL-ONLY
-         *
-         * Therefore:
+         * Expected:
          *
          * totalMatched         = 1
          * totalMismatched      = 1
@@ -513,4 +384,234 @@ class ReconciliationMatcherTest {
         );
     }
 
+    /*
+     * -------------------------------------------------------------
+     * Test: Partial match resolution
+     * -------------------------------------------------------------
+     *
+     * Internal transaction:
+     *
+     * REF-PARTIAL = 100.00
+     *
+     * External records:
+     *
+     * REF-PARTIAL = 60.00
+     * REF-PARTIAL = 40.00
+     *
+     * External total:
+     *
+     * 60.00 + 40.00 = 100.00
+     *
+     * Expected:
+     *
+     * PARTIAL_MATCH_RESOLVED
+     *
+     * NOT:
+     *
+     * AMOUNT_MISMATCH
+     */
+
+    @Test
+    void shouldResolvePartialMatchWhenMultipleExternalRecordsSumToInternalAmount() {
+
+        Transaction internalTransaction =
+                createTransaction(
+                        "REF-PARTIAL",
+                        "100.00"
+                );
+
+        ExternalRecord firstExternalRecord =
+                createExternalRecord(
+                        "REF-PARTIAL",
+                        "60.00"
+                );
+
+        ExternalRecord secondExternalRecord =
+                createExternalRecord(
+                        "REF-PARTIAL",
+                        "40.00"
+                );
+
+        ReconciliationMatcher matcher =
+                new ReconciliationMatcher();
+
+        List<ReconciliationResult> results =
+                matcher.reconcile(
+                        List.of(internalTransaction),
+                        List.of(
+                                firstExternalRecord,
+                                secondExternalRecord
+                        )
+                );
+
+        ReconciliationResult result =
+                findResult(
+                        results,
+                        "REF-PARTIAL"
+                );
+
+        /*
+         * The combined external amount is:
+         *
+         * 60.00 + 40.00 = 100.00
+         *
+         * Therefore this is a resolved partial match.
+         */
+
+        assertEquals(
+                ReconciliationStatus.PARTIAL_MATCH_RESOLVED,
+                result.getStatus()
+        );
+
+        /*
+         * Explicitly verify that it is NOT treated
+         * as an amount mismatch.
+         */
+
+        assertNotEquals(
+                ReconciliationStatus.AMOUNT_MISMATCH,
+                result.getStatus()
+        );
+
+        assertEquals(
+                "REF-PARTIAL",
+                result.getReferenceId()
+        );
+
+        assertNotNull(
+                result.getInternalTransaction()
+        );
+
+        assertNotNull(
+                result.getExternalRecord()
+        );
+    }
+
+    @Test
+void shouldReturnAmountMismatchWhenMultipleExternalRecordsDoNotSumToInternalAmount() {
+
+    Transaction internalTransaction =
+            createTransaction(
+                    "REF-PARTIAL-MISMATCH",
+                    "100.00"
+            );
+
+    ExternalRecord firstExternalRecord =
+            createExternalRecord(
+                    "REF-PARTIAL-MISMATCH",
+                    "60.00"
+            );
+
+    ExternalRecord secondExternalRecord =
+            createExternalRecord(
+                    "REF-PARTIAL-MISMATCH",
+                    "30.00"
+            );
+
+    ReconciliationMatcher matcher =
+            new ReconciliationMatcher();
+
+    List<ReconciliationResult> results =
+            matcher.reconcile(
+                    List.of(internalTransaction),
+                    List.of(
+                            firstExternalRecord,
+                            secondExternalRecord
+                    )
+            );
+
+    ReconciliationResult result =
+            findResult(
+                    results,
+                    "REF-PARTIAL-MISMATCH"
+            );
+
+    assertEquals(
+            ReconciliationStatus.AMOUNT_MISMATCH,
+            result.getStatus()
+    );
+}
+    /*
+     * -------------------------------------------------------------
+     * Helper method: Create internal Transaction
+     * -------------------------------------------------------------
+     */
+
+    private Transaction createTransaction(
+            String referenceId,
+            String amount) {
+
+        Transaction transaction =
+                new Transaction();
+
+        transaction.setId(
+                UUID.randomUUID()
+        );
+
+        transaction.setReferenceId(
+                referenceId
+        );
+
+        transaction.setAmount(
+                new BigDecimal(amount)
+        );
+
+        transaction.setMerchantId(
+                "MERCHANT-001"
+        );
+
+        transaction.setAccountId(
+                "ACCOUNT-001"
+        );
+
+        transaction.setStatus(
+                "PENDING"
+        );
+
+        transaction.setIdempotencyKey(
+                "reconciliation-test-"
+                        + UUID.randomUUID()
+        );
+
+        transaction.setCreatedAt(
+                LocalDateTime.now()
+        );
+
+        return transaction;
+    }
+
+    /*
+     * -------------------------------------------------------------
+     * Helper method: Create external record
+     * -------------------------------------------------------------
+     */
+
+    private ExternalRecord createExternalRecord(
+            String referenceId,
+            String amount) {
+
+        return new ExternalRecord(
+                referenceId,
+                new BigDecimal(amount),
+                LocalDateTime.now()
+        );
+    }
+
+    /*
+     * -------------------------------------------------------------
+     * Helper method: Find result by reference ID
+     * -------------------------------------------------------------
+     */
+
+    private ReconciliationResult findResult(
+            List<ReconciliationResult> results,
+            String referenceId) {
+
+        return results.stream()
+                .filter(result ->
+                        result.getReferenceId()
+                                .equals(referenceId))
+                .findFirst()
+                .orElseThrow();
+    }
 }
