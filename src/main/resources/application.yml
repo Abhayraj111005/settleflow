@@ -33,3 +33,7 @@ logging:
     org.springframework.kafka.listener.DefaultErrorHandler: DEBUG
     org.springframework.kafka.listener.SeekUtils: DEBUG
     org.springframework.kafka.listener.DeadLetterPublishingRecoverer: DEBUG
+
+settleflow:
+  reconciliation:
+    schedule: "*/10 * * * * *"
