@@ -186,6 +186,54 @@ void shouldResolveOpenExceptionManually() {
             .save(exception);
 }
 
+@Test
+void shouldCheckOpenExceptionThresholdWhenCreatingException() {
+
+    Transaction transaction =
+            createTransaction("REF-THRESHOLD", "100.00");
+
+    ExternalRecord externalRecord =
+            createExternalRecord("BATCH-THRESHOLD", "REF-THRESHOLD", "90.00");
+
+    ReconciliationExceptionRepository exceptionRepository =
+            org.mockito.Mockito.mock(
+                    ReconciliationExceptionRepository.class
+            );
+
+    when(
+            exceptionRepository.findByBatchIdAndReferenceIdAndExceptionType(
+                    any(),
+                    any(),
+                    any()
+            )
+    ).thenReturn(Optional.empty());
+
+    when(
+            exceptionRepository.countByStatus(
+                    ReconciliationExceptionStatus.OPEN
+            )
+    ).thenReturn(9L, 10L);
+
+    ReconciliationService service =
+            new ReconciliationService(
+                    org.mockito.Mockito.mock(TransactionRepository.class),
+                    exceptionRepository,
+                    new ReconciliationMatcher(),
+                    new ReconciliationSummaryCalculator()
+            );
+
+    service.reconcile(
+            "BATCH-THRESHOLD",
+            List.of(transaction),
+            List.of(externalRecord)
+    );
+
+    org.mockito.Mockito.verify(
+            exceptionRepository,
+            org.mockito.Mockito.times(2)
+    ).countByStatus(ReconciliationExceptionStatus.OPEN);
+}
+
     private Transaction createTransaction(
             String referenceId,
             String amount) {

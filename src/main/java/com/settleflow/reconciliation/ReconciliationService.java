@@ -6,7 +6,6 @@ import com.settleflow.repository.ReconciliationExceptionRepository;
 import com.settleflow.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.settleflow.reconciliation.ReconciliationExceptionStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,8 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Service
 public class ReconciliationService {
