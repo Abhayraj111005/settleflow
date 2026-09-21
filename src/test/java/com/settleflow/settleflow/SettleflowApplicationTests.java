@@ -1,34 +1,43 @@
 package com.settleflow.settleflow;
 
 import com.settleflow.entity.LedgerEntry;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.settleflow.entity.LedgerEntryType;
 import com.settleflow.entity.ReconciliationException;
 import com.settleflow.entity.Settlement;
 import com.settleflow.entity.Transaction;
+import com.settleflow.reconciliation.ReconciliationExceptionStatus;
 import com.settleflow.repository.LedgerEntryRepository;
 import com.settleflow.repository.ReconciliationExceptionRepository;
 import com.settleflow.repository.SettlementRepository;
 import com.settleflow.repository.TransactionRepository;
 import com.settleflow.service.TransactionService;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -55,6 +64,9 @@ class SettleflowApplicationTests {
     @Autowired
     private ReconciliationExceptionRepository reconciliationExceptionRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
 
     @BeforeEach
     void beforeEach() {
@@ -66,84 +78,85 @@ class SettleflowApplicationTests {
          */
     }
 
+
     @Test
-void resolvingReconciliationExceptionShouldUpdateDatabase()
-        throws Exception {
+    void resolvingReconciliationExceptionShouldUpdateDatabase()
+            throws Exception {
 
-    ReconciliationException exception =
-            new ReconciliationException();
+        ReconciliationException exception =
+                new ReconciliationException();
 
-    exception.setBatchId(
-            "BATCH-MANUAL-" + UUID.randomUUID()
-    );
+        exception.setBatchId(
+                "BATCH-MANUAL-" + UUID.randomUUID()
+        );
 
-    exception.setReferenceId(
-            "REF-MANUAL-" + UUID.randomUUID()
-    );
+        exception.setReferenceId(
+                "REF-MANUAL-" + UUID.randomUUID()
+        );
 
-    exception.setExceptionType(
-            "AMOUNT_MISMATCH"
-    );
+        exception.setExceptionType(
+                "AMOUNT_MISMATCH"
+        );
 
-    exception.setStatus(
-            com.settleflow.reconciliation.ReconciliationExceptionStatus.OPEN
-    );
+        exception.setStatus(
+                ReconciliationExceptionStatus.OPEN
+        );
 
-    exception.setCreatedAt(
-            LocalDateTime.now()
-    );
+        exception.setCreatedAt(
+                LocalDateTime.now()
+        );
 
-    exception =
-            reconciliationExceptionRepository.saveAndFlush(
-                    exception
-            );
+        exception =
+                reconciliationExceptionRepository.saveAndFlush(
+                        exception
+                );
 
-    String note =
-            "Verified against bank statement";
+        String note =
+                "Verified against bank statement";
 
-    mockMvc.perform(
-                    post(
-                            "/reconciliation/exceptions/{exceptionId}/resolve",
-                            exception.getId()
-                    )
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                            """
-                            {
-                              "note": "Verified against bank statement"
-                            }
-                            """
-                    )
-            )
-            .andExpect(status().isOk())
-            .andExpect(
-                    jsonPath("$.status")
-                            .value("RESOLVED_MANUALLY")
-            )
-            .andExpect(
-                    jsonPath("$.resolutionNote")
-                            .value(note)
-            );
+        mockMvc.perform(
+                        post(
+                                "/reconciliation/exceptions/{exceptionId}/resolve",
+                                exception.getId()
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "note": "Verified against bank statement"
+                                        }
+                                        """
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.status")
+                                .value("RESOLVED_MANUALLY")
+                )
+                .andExpect(
+                        jsonPath("$.resolutionNote")
+                                .value(note)
+                );
 
-    ReconciliationException resolved =
-            reconciliationExceptionRepository
-                    .findById(exception.getId())
-                    .orElseThrow();
+        ReconciliationException resolved =
+                reconciliationExceptionRepository
+                        .findById(exception.getId())
+                        .orElseThrow();
 
-    assertEquals(
-            com.settleflow.reconciliation.ReconciliationExceptionStatus.RESOLVED_MANUALLY,
-            resolved.getStatus()
-    );
+        assertEquals(
+                ReconciliationExceptionStatus.RESOLVED_MANUALLY,
+                resolved.getStatus()
+        );
 
-    assertEquals(
-            note,
-            resolved.getResolutionNote()
-    );
+        assertEquals(
+                note,
+                resolved.getResolutionNote()
+        );
 
-    assertNotNull(
-            resolved.getResolvedAt()
-    );
-}
+        assertNotNull(
+                resolved.getResolvedAt()
+        );
+    }
 
 
     @Test
@@ -473,21 +486,9 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
     void reconciliationApiShouldReturnMatchedMismatchAndUnmatched()
             throws Exception {
 
-        /*
-         * ---------------------------------------------------------
-         * UNIQUE TEST RUN
-         * ---------------------------------------------------------
-         */
-
         String testRunId =
                 UUID.randomUUID().toString();
 
-
-        /*
-         * ---------------------------------------------------------
-         * RECONCILIATION BATCH
-         * ---------------------------------------------------------
-         */
 
         String batchId =
                 "BATCH-RECON-" + testRunId;
@@ -505,12 +506,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         String externalOnlyReference =
                 "REF-API-EXTERNAL-ONLY-" + testRunId;
 
-
-        /*
-         * ---------------------------------------------------------
-         * INTERNAL TRANSACTIONS
-         * ---------------------------------------------------------
-         */
 
         Transaction matchedTransaction =
                 createReconciliationTransaction(
@@ -539,17 +534,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                 );
 
 
-        /*
-         * ---------------------------------------------------------
-         * HISTORICAL TRANSACTION
-         * ---------------------------------------------------------
-         *
-         * This transaction belongs to another batch.
-         *
-         * The reconciliation service MUST NOT load or classify
-         * this transaction during the current batch.
-         */
-
         String historicalBatchId =
                 "OLD-BATCH-" + testRunId;
 
@@ -564,23 +548,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                         historicalBatchId
                 );
 
-
-        /*
-         * ---------------------------------------------------------
-         * EXTERNAL RECORDS
-         * ---------------------------------------------------------
-         *
-         * MATCHED:
-         * internal = 100
-         * external = 100
-         *
-         * AMOUNT_MISMATCH:
-         * internal = 200
-         * external = 150
-         *
-         * EXTERNAL ONLY:
-         * no internal transaction exists
-         */
 
         String requestBody = """
                 [
@@ -613,12 +580,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
 
 
-        /*
-         * ---------------------------------------------------------
-         * CALL RECONCILIATION API
-         * ---------------------------------------------------------
-         */
-
         mockMvc.perform(
                         post("/reconciliation")
                                 .contentType(
@@ -629,60 +590,22 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                 .andExpect(
                         status().isOk()
                 )
-
-
-                /*
-                 * -------------------------------------------------
-                 * VERIFY RECONCILIATION SUMMARY
-                 * -------------------------------------------------
-                 *
-                 * Manually calculated:
-                 *
-                 * MATCHED:
-                 *   100.00
-                 *
-                 * MISMATCHED:
-                 *   200.00 vs 150.00
-                 *
-                 * UNMATCHED:
-                 *   INTERNAL ONLY
-                 *   EXTERNAL ONLY
-                 *
-                 * Therefore:
-                 *
-                 * totalMatched         = 1
-                 * totalMismatched      = 1
-                 * totalUnmatched       = 2
-                 * totalValueReconciled = 100.00
-                 */
-
                 .andExpect(
                         jsonPath("$.summary.totalMatched")
                                 .value(1)
                 )
-
                 .andExpect(
                         jsonPath("$.summary.totalMismatched")
                                 .value(1)
                 )
-
                 .andExpect(
                         jsonPath("$.summary.totalUnmatched")
                                 .value(2)
                 )
-
                 .andExpect(
                         jsonPath("$.summary.totalValueReconciled")
                                 .value(100.00)
                 )
-
-
-                /*
-                 * -------------------------------------------------
-                 * VERIFY MATCHED
-                 * -------------------------------------------------
-                 */
-
                 .andExpect(
                         jsonPath(
                                 "$.results[?(@.referenceId == '" +
@@ -694,14 +617,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                                 )
                         )
                 )
-
-
-                /*
-                 * -------------------------------------------------
-                 * VERIFY AMOUNT MISMATCH
-                 * -------------------------------------------------
-                 */
-
                 .andExpect(
                         jsonPath(
                                 "$.results[?(@.referenceId == '" +
@@ -713,14 +628,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                                 )
                         )
                 )
-
-
-                /*
-                 * -------------------------------------------------
-                 * VERIFY INTERNAL ONLY
-                 * -------------------------------------------------
-                 */
-
                 .andExpect(
                         jsonPath(
                                 "$.results[?(@.referenceId == '" +
@@ -732,14 +639,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                                 )
                         )
                 )
-
-
-                /*
-                 * -------------------------------------------------
-                 * VERIFY EXTERNAL ONLY
-                 * -------------------------------------------------
-                 */
-
                 .andExpect(
                         jsonPath(
                                 "$.results[?(@.referenceId == '" +
@@ -752,12 +651,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                         )
                 );
 
-
-        /*
-         * ---------------------------------------------------------
-         * VERIFY MATCHED TRANSACTION WAS PERSISTED
-         * ---------------------------------------------------------
-         */
 
         Transaction persistedMatchedTransaction =
                 transactionRepository
@@ -773,12 +666,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
 
 
-        /*
-         * ---------------------------------------------------------
-         * VERIFY HISTORICAL TRANSACTION WAS NOT TOUCHED
-         * ---------------------------------------------------------
-         */
-
         Transaction persistedHistoricalTransaction =
                 transactionRepository
                         .findById(
@@ -792,11 +679,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                 persistedHistoricalTransaction.getStatus()
         );
 
-
-        /*
-         * There must be no exception for the historical transaction
-         * in the current reconciliation batch.
-         */
 
         assertTrue(
                 reconciliationExceptionRepository
@@ -813,12 +695,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                         )
         );
 
-
-        /*
-         * ---------------------------------------------------------
-         * VERIFY AMOUNT MISMATCH EXCEPTION
-         * ---------------------------------------------------------
-         */
 
         ReconciliationException mismatchException =
                 reconciliationExceptionRepository
@@ -853,13 +729,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
 
 
-        /*
-         * BigDecimal.compareTo() is intentionally used here.
-         *
-         * 200.00 and 200.0000 have different scales but
-         * represent the same monetary value.
-         */
-
         assertEquals(
                 0,
                 new BigDecimal("200.00")
@@ -877,12 +746,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                         )
         );
 
-
-        /*
-         * ---------------------------------------------------------
-         * VERIFY INTERNAL-ONLY UNMATCHED EXCEPTION
-         * ---------------------------------------------------------
-         */
 
         ReconciliationException internalOnlyException =
                 reconciliationExceptionRepository
@@ -931,12 +794,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
 
 
-        /*
-         * ---------------------------------------------------------
-         * VERIFY EXTERNAL-ONLY UNMATCHED EXCEPTION
-         * ---------------------------------------------------------
-         */
-
         ReconciliationException externalOnlyException =
                 reconciliationExceptionRepository
                         .findAll()
@@ -964,10 +821,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
 
 
-        /*
-         * External-only means there is no internal transaction.
-         */
-
         assertNull(
                 externalOnlyException.getTransactionId()
         );
@@ -987,12 +840,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
 
 
-        /*
-         * ---------------------------------------------------------
-         * VERIFY BATCH ID
-         * ---------------------------------------------------------
-         */
-
         assertEquals(
                 batchId,
                 mismatchException.getBatchId()
@@ -1008,15 +855,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
                 externalOnlyException.getBatchId()
         );
 
-
-        /*
-         * ---------------------------------------------------------
-         * RETRY / IDEMPOTENCY TEST
-         * ---------------------------------------------------------
-         *
-         * Re-running the exact same reconciliation batch must
-         * NOT create duplicate exception rows.
-         */
 
         long exceptionCountAfterFirstRun =
                 reconciliationExceptionRepository
@@ -1060,12 +898,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
     }
 
-
-    /*
-     * -------------------------------------------------------------
-     * TEST DATA HELPER
-     * -------------------------------------------------------------
-     */
 
     private Transaction createReconciliationTransaction(
             String referenceId,
@@ -1147,11 +979,6 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         );
 
 
-        /*
-         * Every transaction created for this test explicitly
-         * belongs to the reconciliation batch.
-         */
-
         transaction.setReconciliationBatchId(
                 batchId
         );
@@ -1165,5 +992,352 @@ void resolvingReconciliationExceptionShouldUpdateDatabase()
         return transactionRepository.saveAndFlush(
                 transaction
         );
+    }
+
+
+    @Test
+    void shouldSearchReconciliationExceptionsWithFilters()
+            throws Exception {
+
+        ReconciliationException openException =
+                new ReconciliationException();
+
+        openException.setBatchId(
+                "BATCH-SEARCH-" + UUID.randomUUID()
+        );
+
+        openException.setReferenceId(
+                "REF-OPEN-" + UUID.randomUUID()
+        );
+
+        openException.setExceptionType(
+                "AMOUNT_MISMATCH"
+        );
+
+        openException.setInternalAmount(
+                new BigDecimal("1000.00")
+        );
+
+        openException.setExternalAmount(
+                new BigDecimal("999.00")
+        );
+
+        openException.setCreatedAt(
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        20,
+                        10,
+                        0
+                )
+        );
+
+        openException.setStatus(
+                ReconciliationExceptionStatus.OPEN
+        );
+
+
+        entityManager.persist(
+                openException
+        );
+
+        entityManager.flush();
+
+
+        ReconciliationException resolvedException =
+                new ReconciliationException();
+
+        resolvedException.setBatchId(
+                "BATCH-SEARCH-" + UUID.randomUUID()
+        );
+
+        resolvedException.setReferenceId(
+                "REF-RESOLVED-" + UUID.randomUUID()
+        );
+
+        resolvedException.setExceptionType(
+                "UNMATCHED"
+        );
+
+        resolvedException.setInternalAmount(
+                new BigDecimal("2000.00")
+        );
+
+        resolvedException.setExternalAmount(
+                new BigDecimal("2000.00")
+        );
+
+        resolvedException.setCreatedAt(
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        19,
+                        10,
+                        0
+                )
+        );
+
+        resolvedException.setStatus(
+                ReconciliationExceptionStatus.RESOLVED_MANUALLY
+        );
+
+        resolvedException.setResolutionNote(
+                "Verified manually"
+        );
+
+        resolvedException.setResolvedAt(
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        20,
+                        12,
+                        0
+                )
+        );
+
+
+        entityManager.persist(
+                resolvedException
+        );
+
+        entityManager.flush();
+
+        entityManager.clear();
+
+
+        mockMvc.perform(
+                        get("/reconciliation/exceptions")
+                                .param(
+                                        "status",
+                                        "OPEN"
+                                )
+                                .param(
+                                        "amount",
+                                        "1000.00"
+                                )
+                                .param(
+                                        "from",
+                                        "2026-09-20"
+                                )
+                                .param(
+                                        "to",
+                                        "2026-09-20"
+                                )
+                                .param(
+                                        "page",
+                                        "0"
+                                )
+                                .param(
+                                        "size",
+                                        "20"
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content.length()")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.content[0].referenceId"
+                        ).value(
+                                openException.getReferenceId()
+                        )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.content[0].status"
+                        ).value("OPEN")
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.content[0].internalAmount"
+                        ).value(1000.00)
+                )
+                .andExpect(
+                        jsonPath("$.totalElements")
+                                .value(1)
+                );
+    }
+
+
+    @Test
+    void shouldSearchResolvedReconciliationExceptions()
+            throws Exception {
+
+        String batchId =
+                "BATCH-RESOLVED-" + UUID.randomUUID();
+
+        String referenceId =
+                "REF-RESOLVED-" + UUID.randomUUID();
+
+
+        ReconciliationException resolvedException =
+                new ReconciliationException();
+
+
+        resolvedException.setBatchId(
+                batchId
+        );
+
+
+        resolvedException.setTransactionId(
+                UUID.randomUUID()
+        );
+
+
+        resolvedException.setReferenceId(
+                referenceId
+        );
+
+
+        resolvedException.setExceptionType(
+                "AMOUNT_MISMATCH"
+        );
+
+
+        resolvedException.setInternalAmount(
+                new BigDecimal("2000.00")
+        );
+
+
+        resolvedException.setExternalAmount(
+                new BigDecimal("1990.00")
+        );
+
+
+        resolvedException.setCreatedAt(
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        19,
+                        10,
+                        0
+                )
+        );
+
+
+        resolvedException.setStatus(
+                ReconciliationExceptionStatus.RESOLVED_MANUALLY
+        );
+
+
+        resolvedException.setResolutionNote(
+                "Verified externally"
+        );
+
+
+        resolvedException.setResolvedAt(
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        19,
+                        12,
+                        0
+                )
+        );
+
+
+        /*
+         * IMPORTANT:
+         *
+         * The entity uses:
+         *
+         * @GeneratedValue(strategy = GenerationType.UUID)
+         *
+         * Therefore we deliberately do not call setId().
+         *
+         * EntityManager.persist() explicitly marks this as a new
+         * entity and avoids Spring Data's save()/merge decision.
+         */
+
+        entityManager.persist(
+                resolvedException
+        );
+
+        entityManager.flush();
+
+        entityManager.clear();
+
+
+        mockMvc.perform(
+                        get("/reconciliation/exceptions")
+                                .param(
+                                        "status",
+                                        "RESOLVED_MANUALLY"
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content.length()")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.content[0].referenceId"
+                        ).value(referenceId)
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.content[0].status"
+                        ).value(
+                                "RESOLVED_MANUALLY"
+                        )
+                );
+    }
+
+
+    @Test
+    void shouldRejectInvalidDateRange()
+            throws Exception {
+
+        mockMvc.perform(
+                        get("/reconciliation/exceptions")
+                                .param(
+                                        "from",
+                                        "2026-09-21"
+                                )
+                                .param(
+                                        "to",
+                                        "2026-09-20"
+                                )
+                )
+                .andExpect(
+                        status().isBadRequest()
+                );
+    }
+
+
+    @Test
+    void shouldRejectNegativeAmount()
+            throws Exception {
+
+        mockMvc.perform(
+                        get("/reconciliation/exceptions")
+                                .param(
+                                        "amount",
+                                        "-100.00"
+                                )
+                )
+                .andExpect(
+                        status().isBadRequest()
+                );
+    }
+
+
+    @Test
+    void shouldRejectPageSizeGreaterThan100()
+            throws Exception {
+
+        mockMvc.perform(
+                        get("/reconciliation/exceptions")
+                                .param(
+                                        "size",
+                                        "101"
+                                )
+                )
+                .andExpect(
+                        status().isBadRequest()
+                );
     }
 }

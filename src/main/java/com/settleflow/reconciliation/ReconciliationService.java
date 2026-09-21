@@ -10,13 +10,34 @@ import com.settleflow.reconciliation.ReconciliationExceptionStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 @Service
 public class ReconciliationService {
+
+        private static final Logger log =
+                        LoggerFactory.getLogger(ReconciliationService.class);
+
+        private static final int DEFAULT_OPEN_EXCEPTION_THRESHOLD = 10;
 
     private final TransactionRepository transactionRepository;
     private final ReconciliationExceptionRepository reconciliationExceptionRepository;
     private final ReconciliationMatcher reconciliationMatcher;
     private final ReconciliationSummaryCalculator reconciliationSummaryCalculator;
+
+        @Value("${settleflow.reconciliation.open-exception-threshold:10}")
+        private int openExceptionThreshold = DEFAULT_OPEN_EXCEPTION_THRESHOLD;
 
     public ReconciliationService(
             TransactionRepository transactionRepository,
@@ -179,8 +200,32 @@ public class ReconciliationService {
                 LocalDateTime.now()
         );
 
+        long openExceptionCountBeforeSave =
+                reconciliationExceptionRepository.countByStatus(
+                        ReconciliationExceptionStatus.OPEN
+                );
+
         reconciliationExceptionRepository.save(
                 exception
+        );
+
+        long openExceptionCountAfterSave =
+                reconciliationExceptionCount();
+
+        if (openExceptionCountBeforeSave < openExceptionThreshold
+                && openExceptionCountAfterSave >= openExceptionThreshold) {
+            log.warn(
+                    "OPEN_RECONCILIATION_EXCEPTION_THRESHOLD_CROSSED " +
+                            "openExceptionCount={} threshold={}",
+                    openExceptionCountAfterSave,
+                    openExceptionThreshold
+            );
+        }
+    }
+
+    private long reconciliationExceptionCount() {
+        return reconciliationExceptionRepository.countByStatus(
+                ReconciliationExceptionStatus.OPEN
         );
     }
 
@@ -242,6 +287,103 @@ public class ReconciliationService {
 
         validateBatch(externalRecords);
     }
+    @Transactional(readOnly = true)
+public Page<ReconciliationExceptionResponse> searchExceptions(
+        ReconciliationExceptionStatus status,
+        LocalDate from,
+        LocalDate to,
+        BigDecimal amount,
+        int page,
+        int size) {
+
+    if (page < 0) {
+        throw new IllegalArgumentException(
+                "Page must be greater than or equal to 0"
+        );
+    }
+
+    if (size < 1 || size > 100) {
+        throw new IllegalArgumentException(
+                "Page size must be between 1 and 100"
+        );
+    }
+
+    if (from != null
+            && to != null
+            && from.isAfter(to)) {
+
+        throw new IllegalArgumentException(
+                "From date cannot be after to date"
+        );
+    }
+
+    if (amount != null
+            && amount.compareTo(BigDecimal.ZERO) < 0) {
+
+        throw new IllegalArgumentException(
+                "Amount cannot be negative"
+        );
+    }
+
+    Specification<ReconciliationException> specification =
+            (root, query, criteriaBuilder) ->
+                    criteriaBuilder.conjunction();
+
+    if (status != null) {
+        specification =
+                specification.and(
+                        ReconciliationExceptionSpecification
+                                .statusEquals(status)
+                );
+    }
+
+    if (from != null) {
+        LocalDateTime fromDateTime =
+                from.atStartOfDay();
+
+        specification =
+                specification.and(
+                        ReconciliationExceptionSpecification
+                                .createdAtGreaterThanOrEqual(
+                                        fromDateTime
+                                )
+                );
+    }
+
+    if (to != null) {
+        LocalDateTime toExclusive =
+                to.plusDays(1).atStartOfDay();
+
+        specification =
+                specification.and(
+                        ReconciliationExceptionSpecification
+                                .createdAtLessThan(
+                                        toExclusive
+                                )
+                );
+    }
+
+    if (amount != null) {
+        specification =
+                specification.and(
+                        ReconciliationExceptionSpecification
+                                .amountEquals(amount)
+                );
+    }
+
+    Pageable pageable =
+            PageRequest.of(
+                    page,
+                    size
+            );
+
+    return reconciliationExceptionRepository
+            .findAll(
+                    specification,
+                    pageable
+            )
+            .map(ReconciliationExceptionResponse::from);
+}
 
 @Transactional
 public ReconciliationException resolveException(
