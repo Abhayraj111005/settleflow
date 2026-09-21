@@ -41,3 +41,5 @@ databaseChangeLog:
 
   - include: 
       file: db/changelog/changes/014-add-batch-id-to-reconciliation-exceptions.yaml
+  - include:
+      file: db/changelog/changes/015-add-reconciliation-exception-status.yaml

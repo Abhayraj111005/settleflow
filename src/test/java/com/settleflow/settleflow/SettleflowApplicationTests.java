@@ -1,6 +1,7 @@
 package com.settleflow.settleflow;
 
 import com.settleflow.entity.LedgerEntry;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.settleflow.entity.LedgerEntryType;
 import com.settleflow.entity.ReconciliationException;
 import com.settleflow.entity.Settlement;
@@ -17,7 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,6 +65,85 @@ class SettleflowApplicationTests {
          * verify rollback and persistence behavior.
          */
     }
+
+    @Test
+void resolvingReconciliationExceptionShouldUpdateDatabase()
+        throws Exception {
+
+    ReconciliationException exception =
+            new ReconciliationException();
+
+    exception.setBatchId(
+            "BATCH-MANUAL-" + UUID.randomUUID()
+    );
+
+    exception.setReferenceId(
+            "REF-MANUAL-" + UUID.randomUUID()
+    );
+
+    exception.setExceptionType(
+            "AMOUNT_MISMATCH"
+    );
+
+    exception.setStatus(
+            com.settleflow.reconciliation.ReconciliationExceptionStatus.OPEN
+    );
+
+    exception.setCreatedAt(
+            LocalDateTime.now()
+    );
+
+    exception =
+            reconciliationExceptionRepository.saveAndFlush(
+                    exception
+            );
+
+    String note =
+            "Verified against bank statement";
+
+    mockMvc.perform(
+                    post(
+                            "/reconciliation/exceptions/{exceptionId}/resolve",
+                            exception.getId()
+                    )
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                            """
+                            {
+                              "note": "Verified against bank statement"
+                            }
+                            """
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(
+                    jsonPath("$.status")
+                            .value("RESOLVED_MANUALLY")
+            )
+            .andExpect(
+                    jsonPath("$.resolutionNote")
+                            .value(note)
+            );
+
+    ReconciliationException resolved =
+            reconciliationExceptionRepository
+                    .findById(exception.getId())
+                    .orElseThrow();
+
+    assertEquals(
+            com.settleflow.reconciliation.ReconciliationExceptionStatus.RESOLVED_MANUALLY,
+            resolved.getStatus()
+    );
+
+    assertEquals(
+            note,
+            resolved.getResolutionNote()
+    );
+
+    assertNotNull(
+            resolved.getResolvedAt()
+    );
+}
 
 
     @Test

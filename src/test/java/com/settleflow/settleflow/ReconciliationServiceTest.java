@@ -1,6 +1,10 @@
 package com.settleflow.settleflow;
 
 import com.settleflow.entity.Transaction;
+import com.settleflow.entity.ReconciliationException;
+import com.settleflow.reconciliation.ReconciliationExceptionStatus;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.settleflow.reconciliation.ExternalRecord;
 import com.settleflow.reconciliation.ReconciliationMatcher;
 import com.settleflow.reconciliation.ReconciliationService;
@@ -18,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -110,6 +115,77 @@ class ReconciliationServiceTest {
                 .save(transaction);
     }
 
+@Test
+void shouldResolveOpenExceptionManually() {
+
+    UUID exceptionId = UUID.randomUUID();
+
+    ReconciliationException exception =
+            new ReconciliationException();
+
+    exception.setId(exceptionId);
+    exception.setBatchId("BATCH-001");
+    exception.setReferenceId("REF-001");
+    exception.setExceptionType("AMOUNT_MISMATCH");
+    exception.setStatus(
+            ReconciliationExceptionStatus.OPEN
+    );
+    exception.setCreatedAt(
+            LocalDateTime.now()
+    );
+
+    ReconciliationExceptionRepository exceptionRepository =
+            org.mockito.Mockito.mock(
+                    ReconciliationExceptionRepository.class
+            );
+
+    when(
+            exceptionRepository.findById(exceptionId)
+    ).thenReturn(
+            Optional.of(exception)
+    );
+
+    when(
+            exceptionRepository.save(exception)
+    ).thenReturn(exception);
+
+    TransactionRepository transactionRepository =
+            org.mockito.Mockito.mock(
+                    TransactionRepository.class
+            );
+
+    ReconciliationService service =
+            new ReconciliationService(
+                    transactionRepository,
+                    exceptionRepository,
+                    new ReconciliationMatcher(),
+                    new ReconciliationSummaryCalculator()
+            );
+
+    ReconciliationException resolved =
+            service.resolveException(
+                    exceptionId,
+                    "  Verified against bank statement  "
+            );
+
+    assertEquals(
+            ReconciliationExceptionStatus.RESOLVED_MANUALLY,
+            resolved.getStatus()
+    );
+
+    assertEquals(
+            "Verified against bank statement",
+            resolved.getResolutionNote()
+    );
+
+    assertNotNull(
+            resolved.getResolvedAt()
+    );
+
+    verify(exceptionRepository)
+            .save(exception);
+}
+
     private Transaction createTransaction(
             String referenceId,
             String amount) {
@@ -147,4 +223,126 @@ class ReconciliationServiceTest {
                 LocalDateTime.now()
         );
     }
+
+@Test
+void shouldRejectResolvingAlreadyResolvedException() {
+
+    UUID exceptionId = UUID.randomUUID();
+
+    ReconciliationException exception =
+            new ReconciliationException();
+
+    exception.setId(exceptionId);
+    exception.setBatchId("BATCH-001");
+    exception.setReferenceId("REF-001");
+    exception.setExceptionType("AMOUNT_MISMATCH");
+    exception.setStatus(
+            ReconciliationExceptionStatus.RESOLVED_MANUALLY
+    );
+    exception.setCreatedAt(LocalDateTime.now());
+
+    ReconciliationExceptionRepository exceptionRepository =
+            org.mockito.Mockito.mock(
+                    ReconciliationExceptionRepository.class
+            );
+
+    when(
+            exceptionRepository.findById(exceptionId)
+    ).thenReturn(
+            Optional.of(exception)
+    );
+
+    ReconciliationService service =
+            new ReconciliationService(
+                    org.mockito.Mockito.mock(TransactionRepository.class),
+                    exceptionRepository,
+                    new ReconciliationMatcher(),
+                    new ReconciliationSummaryCalculator()
+            );
+
+    assertThrows(
+            IllegalStateException.class,
+            () -> service.resolveException(
+                    exceptionId,
+                    "Trying to resolve again"
+            )
+    );
+}
+
+@Test
+void shouldRejectBlankResolutionNote() {
+
+    UUID exceptionId = UUID.randomUUID();
+
+    ReconciliationException exception =
+            new ReconciliationException();
+
+    exception.setId(exceptionId);
+    exception.setBatchId("BATCH-001");
+    exception.setReferenceId("REF-001");
+    exception.setExceptionType("UNMATCHED");
+    exception.setStatus(
+            ReconciliationExceptionStatus.OPEN
+    );
+    exception.setCreatedAt(LocalDateTime.now());
+
+    ReconciliationExceptionRepository exceptionRepository =
+            org.mockito.Mockito.mock(
+                    ReconciliationExceptionRepository.class
+            );
+
+    when(
+            exceptionRepository.findById(exceptionId)
+    ).thenReturn(
+            Optional.of(exception)
+    );
+
+    ReconciliationService service =
+            new ReconciliationService(
+                    org.mockito.Mockito.mock(TransactionRepository.class),
+                    exceptionRepository,
+                    new ReconciliationMatcher(),
+                    new ReconciliationSummaryCalculator()
+            );
+
+    assertThrows(
+            IllegalArgumentException.class,
+            () -> service.resolveException(
+                    exceptionId,
+                    "   "
+            )
+    );
+}
+@Test
+void shouldRejectUnknownExceptionId() {
+
+    UUID exceptionId = UUID.randomUUID();
+
+    ReconciliationExceptionRepository exceptionRepository =
+            org.mockito.Mockito.mock(
+                    ReconciliationExceptionRepository.class
+            );
+
+    when(
+            exceptionRepository.findById(exceptionId)
+    ).thenReturn(
+            Optional.empty()
+    );
+
+    ReconciliationService service =
+            new ReconciliationService(
+                    org.mockito.Mockito.mock(TransactionRepository.class),
+                    exceptionRepository,
+                    new ReconciliationMatcher(),
+                    new ReconciliationSummaryCalculator()
+            );
+
+    assertThrows(
+            IllegalArgumentException.class,
+            () -> service.resolveException(
+                    exceptionId,
+                    "Verified manually"
+            )
+    );
+}
 }

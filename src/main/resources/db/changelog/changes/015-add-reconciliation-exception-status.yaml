@@ -1,0 +1,37 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 015-add-reconciliation-exception-status
+      author: settleflow
+
+      changes:
+
+        - addColumn:
+            tableName: reconciliation_exceptions
+            columns:
+              - column:
+                  name: status
+                  type: VARCHAR(30)
+
+        - update:
+            tableName: reconciliation_exceptions
+            columns:
+              - column:
+                  name: status
+                  value: OPEN
+
+        - addNotNullConstraint:
+            tableName: reconciliation_exceptions
+            columnName: status
+            columnDataType: VARCHAR(30)
+
+        - addColumn:
+            tableName: reconciliation_exceptions
+            columns:
+              - column:
+                  name: resolution_note
+                  type: VARCHAR(1000)
+
+              - column:
+                  name: resolved_at
+                  type: TIMESTAMP

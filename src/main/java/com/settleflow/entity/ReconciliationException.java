@@ -1,7 +1,7 @@
 package com.settleflow.entity;
 
 import jakarta.persistence.*;
-
+import com.settleflow.reconciliation.ReconciliationExceptionStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -55,7 +55,16 @@ public class ReconciliationException {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private ReconciliationExceptionStatus status;
 
+    @Column(name = "resolution_note", length = 1000)
+    private String resolutionNote;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;		
+    
     public UUID getId() {
         return id;
     }
@@ -126,4 +135,27 @@ public class ReconciliationException {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+   public ReconciliationExceptionStatus getStatus() {
+    return status;
+}
+
+public void setStatus(ReconciliationExceptionStatus status) {
+    this.status = status;
+}
+
+public String getResolutionNote() {
+    return resolutionNote;
+}
+
+public void setResolutionNote(String resolutionNote) {
+    this.resolutionNote = resolutionNote;
+}
+
+public LocalDateTime getResolvedAt() {
+    return resolvedAt;
+}
+
+public void setResolvedAt(LocalDateTime resolvedAt) {
+    this.resolvedAt = resolvedAt;
+}
 }

@@ -4,10 +4,9 @@ import com.settleflow.entity.ReconciliationException;
 import com.settleflow.entity.Transaction;
 import com.settleflow.repository.ReconciliationExceptionRepository;
 import com.settleflow.repository.TransactionRepository;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.settleflow.reconciliation.ReconciliationExceptionStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -150,6 +149,7 @@ public class ReconciliationService {
         exception.setBatchId(batchId);
         exception.setReferenceId(referenceId);
         exception.setExceptionType(exceptionType);
+	exception.setStatus(ReconciliationExceptionStatus.OPEN);
 
         Transaction internalTransaction =
                 result.getInternalTransaction();
@@ -242,4 +242,46 @@ public class ReconciliationService {
 
         validateBatch(externalRecords);
     }
+
+@Transactional
+public ReconciliationException resolveException(
+        java.util.UUID exceptionId,
+        String note) {
+
+    ReconciliationException exception =
+            reconciliationExceptionRepository.findById(exceptionId)
+                    .orElseThrow(() ->
+                            new IllegalArgumentException(
+                                    "Reconciliation exception not found: "
+                                            + exceptionId
+                            )
+                    );
+
+    if (exception.getStatus()
+            != ReconciliationExceptionStatus.OPEN) {
+
+        throw new IllegalStateException(
+                "Reconciliation exception is not open: "
+                        + exceptionId
+        );
+    }
+
+    if (note == null || note.isBlank()) {
+
+        throw new IllegalArgumentException(
+                "Resolution note cannot be null or blank"
+        );
+    }
+
+    exception.setStatus(
+            ReconciliationExceptionStatus.RESOLVED_MANUALLY
+    );
+
+    exception.setResolutionNote(note.trim());
+
+    exception.setResolvedAt(LocalDateTime.now());
+
+    return reconciliationExceptionRepository.save(exception);
 }
+}
+
