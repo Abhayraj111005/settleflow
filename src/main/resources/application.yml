@@ -38,3 +38,6 @@ settleflow:
   reconciliation:
     schedule: "*/10 * * * * *"
     open-exception-threshold: 10
+  rate-limit:
+    capacity: 5
+    refill-rate: 1

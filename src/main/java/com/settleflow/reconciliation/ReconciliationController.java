@@ -2,12 +2,14 @@ package com.settleflow.reconciliation;
 
 import org.springframework.web.bind.annotation.*;
 import com.settleflow.entity.ReconciliationException;
-import org.springframework.web.bind.annotation.PathVariable;
+
 import java.util.UUID;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
-
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -16,11 +18,15 @@ import java.time.LocalDate;
 public class ReconciliationController {
 
     private final ReconciliationService reconciliationService;
+    private final TokenBucketRateLimiter rateLimiter;
 
     public ReconciliationController(
-            ReconciliationService reconciliationService) {
-        this.reconciliationService = reconciliationService;
-    }
+        ReconciliationService reconciliationService,
+        TokenBucketRateLimiter rateLimiter) {
+
+    this.reconciliationService = reconciliationService;
+    this.rateLimiter = rateLimiter;
+}
 
     @PostMapping
     public ReconciliationResponse reconcile(
@@ -44,6 +50,7 @@ public ReconciliationException resolveException(
 
 @GetMapping("/exceptions")
 public Page<ReconciliationExceptionResponse> searchExceptions(
+        HttpServletRequest request,
 
         @RequestParam(required = false)
         ReconciliationExceptionStatus status,
@@ -65,6 +72,15 @@ public Page<ReconciliationExceptionResponse> searchExceptions(
         @RequestParam(defaultValue = "20")
         int size) {
 
+    String clientId = request.getRemoteAddr();
+
+    if (!rateLimiter.isAllowed(clientId)) {
+        throw new ResponseStatusException(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "Rate limit exceeded"
+        );
+    }
+
     return reconciliationService.searchExceptions(
             status,
             from,
@@ -75,3 +91,4 @@ public Page<ReconciliationExceptionResponse> searchExceptions(
     );
 }
 }
+
