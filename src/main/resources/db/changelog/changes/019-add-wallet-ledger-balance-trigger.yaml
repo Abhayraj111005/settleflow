@@ -1,0 +1,64 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 019-add-wallet-ledger-balance-trigger
+      author: settleflow
+
+      changes:
+
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION validate_wallet_operation_ledger_balance()
+              RETURNS TRIGGER
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  entry_count INTEGER;
+                  debit_count INTEGER;
+                  credit_count INTEGER;
+                  debit_amount NUMERIC(19,4);
+                  credit_amount NUMERIC(19,4);
+              BEGIN
+                  IF COALESCE(NEW.wallet_operation_id, OLD.wallet_operation_id) IS NULL THEN
+                      RETURN COALESCE(NEW, OLD);
+                  END IF;
+
+                  SELECT
+                      COUNT(*),
+                      COUNT(*) FILTER (WHERE entry_type = 'DEBIT'),
+                      COUNT(*) FILTER (WHERE entry_type = 'CREDIT'),
+                      COALESCE(SUM(amount) FILTER (WHERE entry_type = 'DEBIT'), 0),
+                      COALESCE(SUM(amount) FILTER (WHERE entry_type = 'CREDIT'), 0)
+                  INTO
+                      entry_count,
+                      debit_count,
+                      credit_count,
+                      debit_amount,
+                      credit_amount
+                  FROM ledger_entries
+                  WHERE wallet_operation_id =
+                      COALESCE(NEW.wallet_operation_id, OLD.wallet_operation_id);
+
+                  IF entry_count <> 2
+                     OR debit_count <> 1
+                     OR credit_count <> 1
+                     OR debit_amount <> credit_amount THEN
+
+                      RAISE EXCEPTION
+                          'Wallet operation ledger is not balanced: operation_id=%',
+                          COALESCE(NEW.wallet_operation_id, OLD.wallet_operation_id);
+                  END IF;
+
+                  RETURN COALESCE(NEW, OLD);
+              END;
+              $$;
+
+        - sql:
+            sql: |
+              CREATE CONSTRAINT TRIGGER wallet_operation_ledger_balance_trigger
+              AFTER INSERT OR UPDATE OR DELETE
+              ON ledger_entries
+              DEFERRABLE INITIALLY DEFERRED
+              FOR EACH ROW
+              EXECUTE FUNCTION validate_wallet_operation_ledger_balance();

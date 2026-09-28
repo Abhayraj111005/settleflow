@@ -1,0 +1,69 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-fix-settlement-ledger-trigger-for-wallet
+      author: settleflow
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION validate_ledger_entry_balance()
+              RETURNS TRIGGER
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  target_transaction_id UUID;
+                  entry_count INTEGER;
+                  debit_count INTEGER;
+                  credit_count INTEGER;
+                  debit_amount NUMERIC(19,4);
+                  credit_amount NUMERIC(19,4);
+              BEGIN
+                  target_transaction_id :=
+                      COALESCE(NEW.transaction_id, OLD.transaction_id);
+
+                  -- Wallet ledger entries are validated by the
+                  -- wallet-operation-specific trigger.
+                  IF target_transaction_id IS NULL THEN
+                      RETURN COALESCE(NEW, OLD);
+                  END IF;
+
+                  SELECT
+                      COUNT(*),
+                      COUNT(*) FILTER (WHERE entry_type = 'DEBIT'),
+                      COUNT(*) FILTER (WHERE entry_type = 'CREDIT'),
+                      COALESCE(SUM(amount) FILTER (WHERE entry_type = 'DEBIT'), 0),
+                      COALESCE(SUM(amount) FILTER (WHERE entry_type = 'CREDIT'), 0)
+                  INTO
+                      entry_count,
+                      debit_count,
+                      credit_count,
+                      debit_amount,
+                      credit_amount
+                  FROM ledger_entries
+                  WHERE transaction_id = target_transaction_id;
+
+                  IF entry_count <> 2 THEN
+                      RAISE EXCEPTION
+                          'Transaction % must have exactly 2 ledger entries, found %',
+                          target_transaction_id,
+                          entry_count;
+                  END IF;
+
+                  IF debit_count <> 1 OR credit_count <> 1 THEN
+                      RAISE EXCEPTION
+                          'Transaction % must have exactly one debit and one credit',
+                          target_transaction_id;
+                  END IF;
+
+                  IF debit_amount <> credit_amount THEN
+                      RAISE EXCEPTION
+                          'Transaction % ledger is not balanced: debit=%, credit=%',
+                          target_transaction_id,
+                          debit_amount,
+                          credit_amount;
+                  END IF;
+
+                  RETURN COALESCE(NEW, OLD);
+              END;
+              $$;
+

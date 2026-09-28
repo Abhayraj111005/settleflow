@@ -1,0 +1,48 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 016-create-wallets-table
+      author: settleflow
+
+      changes:
+
+        - createTable:
+            tableName: wallets
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: balance
+                  type: DECIMAL(19,4)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: held_amount
+                  type: DECIMAL(19,4)
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: >
+              ALTER TABLE wallets
+              ADD CONSTRAINT chk_wallet_balance_non_negative
+              CHECK (balance >= 0);
+
+        - sql:
+            sql: >
+              ALTER TABLE wallets
+              ADD CONSTRAINT chk_wallet_held_amount_non_negative
+              CHECK (held_amount >= 0);
+
+        - sql:
+            sql: >
+              ALTER TABLE wallets
+              ADD CONSTRAINT chk_wallet_held_not_exceed_balance
+              CHECK (held_amount <= balance);

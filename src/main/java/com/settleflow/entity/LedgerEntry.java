@@ -13,8 +13,11 @@ public class LedgerEntry {
     @Id
     private UUID id;
 
-    @Column(name = "transaction_id", nullable = false)
+    @Column(name = "transaction_id")
     private UUID transactionId;
+
+    @Column(name = "wallet_operation_id")
+    private UUID walletOperationId;
 
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
@@ -25,6 +28,10 @@ public class LedgerEntry {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    // Keep this public because existing TransactionService uses new LedgerEntry().
+    public LedgerEntry() {
+    }
 
     public UUID getId() {
         return id;
@@ -40,6 +47,14 @@ public class LedgerEntry {
 
     public void setTransactionId(UUID transactionId) {
         this.transactionId = transactionId;
+    }
+
+    public UUID getWalletOperationId() {
+        return walletOperationId;
+    }
+
+    public void setWalletOperationId(UUID walletOperationId) {
+        this.walletOperationId = walletOperationId;
     }
 
     public BigDecimal getAmount() {
@@ -64,5 +79,20 @@ public class LedgerEntry {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public static LedgerEntry forWalletOperation(
+            UUID id,
+            UUID walletOperationId,
+            BigDecimal amount,
+            LedgerEntryType entryType
+    ) {
+        LedgerEntry entry = new LedgerEntry();
+        entry.setId(id);
+        entry.setWalletOperationId(walletOperationId);
+        entry.setAmount(amount);
+        entry.setEntryType(entryType);
+        entry.setCreatedAt(LocalDateTime.now());
+        return entry;
     }
 }

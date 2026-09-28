@@ -1,0 +1,36 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 018-add-wallet-operation-to-ledger
+      author: settleflow
+
+      changes:
+
+        - dropNotNullConstraint:
+            tableName: ledger_entries
+            columnName: transaction_id
+            columnDataType: UUID
+
+        - addColumn:
+            tableName: ledger_entries
+            columns:
+              - column:
+                  name: wallet_operation_id
+                  type: UUID
+
+        - addForeignKeyConstraint:
+            baseTableName: ledger_entries
+            baseColumnNames: wallet_operation_id
+            referencedTableName: wallet_operations
+            referencedColumnNames: id
+            constraintName: fk_ledger_entries_wallet_operation
+
+        - sql:
+            sql: >
+              ALTER TABLE ledger_entries
+              ADD CONSTRAINT chk_ledger_entry_owner
+              CHECK (
+                  (transaction_id IS NOT NULL AND wallet_operation_id IS NULL)
+                  OR
+                  (transaction_id IS NULL AND wallet_operation_id IS NOT NULL)
+              );

@@ -1,0 +1,61 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 017-create-wallet-operations-table
+      author: settleflow
+
+      changes:
+
+        - createTable:
+            tableName: wallet_operations
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: wallet_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: amount
+                  type: DECIMAL(19,4)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: wallet_operations
+            baseColumnNames: wallet_id
+            referencedTableName: wallets
+            referencedColumnNames: id
+            constraintName: fk_wallet_operations_wallet
+
+        - sql:
+            sql: >
+              ALTER TABLE wallet_operations
+              ADD CONSTRAINT chk_wallet_operation_amount_positive
+              CHECK (amount > 0);
+
+        - sql:
+            sql: >
+              ALTER TABLE wallet_operations
+              ADD CONSTRAINT chk_wallet_operation_type
+              CHECK (type IN ('HOLD', 'RELEASE', 'COMMIT'));

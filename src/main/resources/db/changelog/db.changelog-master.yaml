@@ -43,3 +43,13 @@ databaseChangeLog:
       file: db/changelog/changes/014-add-batch-id-to-reconciliation-exceptions.yaml
   - include:
       file: db/changelog/changes/015-add-reconciliation-exception-status.yaml
+  - include:
+      file: db/changelog/changes/016-create-wallets-table.yaml
+  - include:
+      file: db/changelog/changes/017-create-wallet-operations-table.yaml
+  - include:
+      file: db/changelog/changes/018-add-wallet-operation-to-ledger.yaml
+  - include:
+      file: db/changelog/changes/019-add-wallet-ledger-balance-trigger.yaml
+  - include:
+      file: db/changelog/changes/020-fix-settlement-ledger-trigger-for-wallet.yaml

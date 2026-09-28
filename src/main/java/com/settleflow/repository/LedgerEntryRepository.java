@@ -11,4 +11,5 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
     List<LedgerEntry> findByTransactionId(UUID transactionId);
 
     long countByTransactionId(UUID transactionId);
+    List<LedgerEntry> findByWalletOperationId(UUID walletOperationId);
 }
